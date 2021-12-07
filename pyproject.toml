@@ -1,0 +1,34 @@
+# Copyright (C) 2021 - present  Alexander Czutro <github@czutro.ch>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# For more details, see the provided licence file or
+# <http://www.gnu.org/licenses>.
+#
+################################################################### aczutro ###
+
+[tool.poetry]
+name = "czytget"
+version = "1.0.0"
+description = "A simple server to execute multiple parallel download jobs."
+authors = ["Alexander Czutro <github@czutro.ch>"]
+homepage = "https://github.com/aczutro/czytget"
+license = "GPL-3.0-or-later"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+czutils = "^1.3.0"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+czytgetd = "czytget:czytgetd"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+### aczutro ###################################################################
