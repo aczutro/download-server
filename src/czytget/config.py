@@ -10,16 +10,35 @@
 #
 ################################################################### aczutro ###
 
-"""Command line parser for czytget."""
+"""Config and command line parsing for czytget."""
+
+import czutils.utils.czcode
 
 
-class CommandLineParser:
+@czutils.utils.czcode.autoStr
+class ServerConfig:
+    """server config"""
+
+    def __init__(self):
+        self.numThreads = 4
+    #__init__
 
     def parseCommandLine(self):
         pass
     #parseCommandLine
 
-#CommandLineParser
+#ServerConfig
+
+
+@czutils.utils.czcode.autoStr
+class ClientConfig:
+    """client config"""
+
+    def __init__(self):
+        self.responseTimeout = 10 # seconds
+    #__init__
+
+#ClientConfig
 
 
 ### aczutro ###################################################################

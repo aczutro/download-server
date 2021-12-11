@@ -15,7 +15,7 @@
 import czytget
 
 if __name__ == '__main__':
-    czytget.czytgetd()
+    czytget.czytget()
 #if
 
 ### aczutro ###################################################################

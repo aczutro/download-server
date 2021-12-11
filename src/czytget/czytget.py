@@ -12,31 +12,47 @@
 
 """A simple server to execute multiple parallel download jobs."""
 
-from .commandline import CommandLineParser
-from .server import Server, ServerError
-from czutils.utils import czlogging, czsystem
+from .config import ClientConfig, ServerConfig
+from .server import Server, setLoggingLevel as setLoggingLevelServer
+from .client import Client, setLoggingLevel as setLoggingLevelClient
+from czutils.utils import czlogging, czsystem, czthreading
 import sys
 
-def mainServer():
+
+def main():
     """
     Main routine of the czytget daemon/server.
     """
-    L = czlogging.LogChannel(czsystem.appName())
+    logger = czlogging.LoggingChannel(czsystem.appName(),
+                                      czlogging.LoggingLevel.WARNING)
+    #setLoggingLevelClient(czlogging.LoggingLevel.INFO, colour=True)
+    setLoggingLevelServer(czlogging.LoggingLevel.INFO, colour=True)
+    #czthreading.setLoggingLevel(czlogging.LoggingLevel.INFO, colour=True)
+
     try:
-        CLP = CommandLineParser()
-        args = CLP.parseCommandLine()
-        L.info(args)
-        S = Server()
-        S.start()
-        S.wait()
+        serverConfig = ServerConfig()
+        serverConfig.parseCommandLine()
+        logger.info(serverConfig)
+
+        clientConfig = ClientConfig()
+        logger.info(clientConfig)
+
+        server = Server(serverConfig)
+        server.start()
+
+        client = Client(clientConfig, server)
+        client.start()
+
+        server.wait()
+        client.wait()
         sys.exit(0)
     except AssertionError as e:
         raise e
-    except ServerError as e:
-        L.error(e)
-        sys.exit(1)
+    # except ServerError as e:
+    #     logger.error(e)
+    #     sys.exit(1)
     except Exception as e:
-        L.error(e)
+        logger.error(e)
         sys.exit(2)
     #except
 #autoStr
