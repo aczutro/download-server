@@ -12,7 +12,7 @@
 
 """A simple server to execute multiple parallel download jobs."""
 
-from .config import ClientConfig, ServerConfig
+from .config import parseConfig, setLoggingLevel as setLoggingLevelConfig
 from .server import Server, setLoggingLevel as setLoggingLevelServer
 from .client import Client, setLoggingLevel as setLoggingLevelClient
 from czutils.utils import czlogging, czsystem, czthreading
@@ -25,16 +25,15 @@ def main():
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
-    #setLoggingLevelClient(czlogging.LoggingLevel.INFO, colour=True)
-    setLoggingLevelServer(czlogging.LoggingLevel.INFO, colour=True)
-    #czthreading.setLoggingLevel(czlogging.LoggingLevel.INFO, colour=True)
+    #czsystem.setLoggingLevel(czlogging.LoggingLevel.INFO)
+    #czthreading.setLoggingLevel(czlogging.LoggingLevel.INFO)
+    #setLoggingLevelConfig(czlogging.LoggingLevel.INFO)
+    #setLoggingLevelClient(czlogging.LoggingLevel.INFO)
+    setLoggingLevelServer(czlogging.LoggingLevel.INFO)
 
     try:
-        serverConfig = ServerConfig()
-        serverConfig.parseCommandLine()
+        serverConfig, clientConfig = parseConfig(".config/czytgetrc")
         logger.info(serverConfig)
-
-        clientConfig = ClientConfig()
         logger.info(clientConfig)
 
         server = Server(serverConfig)
