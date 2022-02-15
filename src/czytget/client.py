@@ -24,7 +24,7 @@ _logger = czlogging.LoggingChannel("czytget.client",
                                    czlogging.LoggingLevel.SILENT,
                                    colour=True)
 
-def setLoggingLevel(level: int, colour=True) -> None:
+def setLoggingOptions(level: int, colour=True) -> None:
     """
     Sets this module's logging level.  If not called, the logging level is
     SILENT.
@@ -40,7 +40,7 @@ def setLoggingLevel(level: int, colour=True) -> None:
     global _logger
     _logger = czlogging.LoggingChannel("czytget.client", level, colour=colour)
 
-#setLoggingLevel
+#setLoggingOptions
 
 
 class Client(czthreading.Thread, cmd.Cmd):
