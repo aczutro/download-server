@@ -15,6 +15,9 @@
 from .config import ServerConfig
 from .messages import *
 from czutils.utils import czlogging, czthreading
+import datetime
+import os
+import pickle
 import random
 import time
 
@@ -40,6 +43,17 @@ def setLoggingOptions(level: int, colour=True) -> None:
     _logger = czlogging.LoggingChannel("czytget.server", level, colour=colour)
 
 #setLoggingOptions
+
+
+class ServerError(Exception):
+    """
+    Exception class thrown by parseConfig
+    """
+    def __init__(self, what: str):
+        super().__init__(what)
+    #__init__
+
+#ServerError
 
 
 class Worker(czthreading.ReactiveThread):
@@ -90,6 +104,54 @@ class Worker(czthreading.ReactiveThread):
 #Worker
 
 
+_FINISHED_FILE = "finished.pkl"
+_PROCESSING_FILE = "processing.pkl"
+_QUEUED_FILE = "queued.pkl"
+
+_FILE_CANDIDATES = ( _FINISHED_FILE, _PROCESSING_FILE, _QUEUED_FILE )
+
+
+def _getSubdirs(root: str) -> list[str]:
+    return sorted(list([ os.path.basename(direc) \
+                         for direc, subdirs, files in os.walk(root) \
+                         if len(set(files).intersection(_FILE_CANDIDATES)) ]))
+#_getSubDirs
+
+
+def _dumpFile(filename: str, q: set):
+    try:
+        with open(filename, "wb") as f:
+            pickle.dump(q, f)
+        #with
+    except Exception as e:
+        _logger.error("Server: failed to dump data to file '%s': %s"
+                      % (filename, e))
+    #except
+#_dumpFile
+
+
+def _loadFile(filename: str, previous: set) -> set:
+    if os.path.exists(filename):
+        try:
+            with open(filename, "rb") as f:
+                data = pickle.load(f)
+            #with
+        except Exception as e:
+            _logger.error("Server: failed to read data file '%s': %s"
+                          % (filename, e))
+            raise ServerError("ERROR: failed to read data file '%s': %s"
+                              % (filename, e))
+        #except
+        if type(data) != set:
+            _logger.error("Server: corrupted data file '%s'" % filename)
+            raise ServerError("ERROR: corrupted data file '%s'" % filename)
+        else:
+            return previous.union(data)
+        #else
+    #if
+#_loadFile
+
+
 class Server(czthreading.ReactiveThread):
     """
     Implements a loop that takes commands from a client via messages of the
@@ -98,6 +160,7 @@ class Server(czthreading.ReactiveThread):
         - MsgAdd
         - MsgList
         - MsgAllocate
+        - MsgDateList
 
     Some commands expect a server response.  If the command message provides
     a response buffer (queue.Queue), the server puts the response into that
@@ -105,10 +168,29 @@ class Server(czthreading.ReactiveThread):
     """
 
     def __init__(self, config: ServerConfig):
+        """
+        Constructor.
+
+        :raises: ServerError
+        """
         super().__init__('czytget-server', 1)
-        self._config = config
+        self._dataDir \
+            = os.path.join(config.dataDir,
+                           datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        try:
+            os.makedirs(self._dataDir)
+            _logger.info("Server: writing data to", self._dataDir)
+        except OSError as e:
+            errorString = "Server: cannot create data dir '%s': %s"\
+                          % (self._dataDir, e)
+            _logger.error(errorString)
+            raise ServerError(errorString)
+        #except
+        self._finishedFile = os.path.join(self._dataDir, _FINISHED_FILE)
+        self._processingFile = os.path.join(self._dataDir, _PROCESSING_FILE)
+        self._queuedFile = os.path.join(self._dataDir, _QUEUED_FILE)
         self._workers = [ Worker("worker-%d" % i, self)
-                          for i in range(self._config.numThreads) ]
+                          for i in range(config.numThreads) ]
         self._queuedCodes = set()
         self._processingCodes = set()
         self._finishedCodes = set()
@@ -116,7 +198,9 @@ class Server(czthreading.ReactiveThread):
         self.addMessageProcessor("MsgAdd", self.processMsgAdd)
         self.addMessageProcessor("MsgList", self.processMsgList)
         self.addMessageProcessor("MsgAllocate", self.processMsgAllocate)
-
+        self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
+        self.addMessageProcessor("MsgLoadSession", self.processMsgLoadSession)
+        self.addMessageProcessor("MsgLoadAll", self.processMsgLoadAll)
     #__init__
 
 
@@ -148,6 +232,7 @@ class Server(czthreading.ReactiveThread):
         else:
             self._queuedCodes.add(ytCode)
         #if
+        self._dumpAll()
         self.comm(MsgAllocate())
     #processMsgAck
 
@@ -174,6 +259,7 @@ class Server(czthreading.ReactiveThread):
                 message.responseBuffer.put("YT code '%s' queued" % message.ytCode)
             #if
             self._queuedCodes.add(ytCode)
+            self._dumpQueued()
             self.comm(MsgAllocate())
         #else
 
@@ -208,21 +294,74 @@ class Server(czthreading.ReactiveThread):
             if worker.free():
                 try:
                     ytCode = self._queuedCodes.pop()
-                    worker.comm(MsgTask(ytCode))
                     self._processingCodes.add(ytCode)
+                    self._dumpQueued()
+                    self._dumpProcessing()
+                    worker.comm(MsgTask(ytCode))
                 except KeyError:
                     pass
                 #except
             #if
         #for
-
     #processMsgAllocate
 
 
-    # def process(self, message: Msg):
-    #     pass
-    #
-    # #process
+    def processMsgSessionList(self, message: MsgSessionList):
+        message.responseBuffer.put(
+            '\n'.join(_getSubdirs(os.path.dirname(self._dataDir))))
+    #processMsgDateList
+
+
+    def _loadSession(self, session: str, finishedToo: bool):
+        _logger.info("loading", session)
+        if not os.path.exists(session):
+            raise ServerError("ERROR: session '%s' does not exist" % session)
+        #if
+        self._queuedCodes = _loadFile(
+            os.path.join(session, _PROCESSING_FILE), self._queuedCodes)
+        self._queuedCodes = _loadFile(
+            os.path.join(session, _QUEUED_FILE), self._queuedCodes)
+        if finishedToo:
+            self._finishedCodes = _loadFile(
+                os.path.join(session, _FINISHED_FILE), self._finishedCodes)
+        #if
+    #_loadSession
+
+
+    def processMsgLoadSession(self, message: MsgLoadSession):
+        dataDir = os.path.join(os.path.dirname(self._dataDir), message.session)
+        try:
+            self._loadSession(dataDir, True)
+            if message.responseBuffer is not None:
+                message.responseBuffer.put("successfully loaded session '%s'"
+                                           % message.session)
+            #if
+        except ServerError as e:
+            if message.responseBuffer is not None:
+                message.responseBuffer.put(str(e))
+            #if
+        #except
+        self.comm(MsgAllocate())
+    #processMsgLoadSession
+
+
+    def processMsgLoadAll(self, message: MsgLoadAll):
+        sessions = _getSubdirs(os.path.dirname(self._dataDir))
+        try:
+            for session in sessions:
+                self._loadSession(os.path.join(os.path.dirname(self._dataDir), session),
+                                  not message.pendingOnly)
+            #for
+            if message.responseBuffer is not None:
+                message.responseBuffer.put("successfully loaded all sessions")
+            #if
+        except ServerError as e:
+            if message.responseBuffer is not None:
+                message.responseBuffer.put(str(e))
+            #if
+        #except
+        self.comm(MsgAllocate())
+    #processMsgLoadAll
 
 
     # def process(self, message: Msg):
@@ -231,16 +370,23 @@ class Server(czthreading.ReactiveThread):
     # #process
 
 
-    # def process(self, message: Msg):
-    #     pass
-    #
-    # #process
+    def _dumpAll(self):
+        self._dumpQueued()
+        self._dumpProcessing()
+        self._dumpFinished()
+    #_dumpAll
 
+    def _dumpFinished(self):
+        _dumpFile(self._finishedFile, self._finishedCodes)
+    #_dumpFinished
 
-    # def process(self, message: Msg):
-    #     pass
-    #
-    # #process
+    def _dumpProcessing(self):
+        _dumpFile(self._processingFile, self._processingCodes)
+    #_dumpProcessing
+
+    def _dumpQueued(self):
+        _dumpFile(self._queuedFile, self._queuedCodes)
+    #_dumpQueued
 
 #Server
 

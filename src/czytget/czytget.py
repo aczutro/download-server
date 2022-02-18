@@ -32,7 +32,7 @@ def main():
     setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
 
     try:
-        serverConfig, clientConfig = parseConfig(".config/czytgetrc")
+        serverConfig, clientConfig = parseConfig(".config/czytget")
         logger.info(serverConfig)
         logger.info(clientConfig)
 

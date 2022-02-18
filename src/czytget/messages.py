@@ -65,9 +65,51 @@ class MsgAdd(czthreading.Message):
 class MsgList(czthreading.Message):
     """
     List command sent by client to server.
+
+    The response buffer must not be None.
     """
     def __init__(self, responseBuffer: queue.Queue):
         super().__init__()
+        self.responseBuffer = responseBuffer
+    #__init__
+
+#MsgList
+
+
+class MsgSessionList(czthreading.Message):
+    """
+    "Session ls" command sent by client to server.
+
+    The response buffer must not be None.
+    """
+    def __init__(self, responseBuffer: queue.Queue):
+        super().__init__()
+        self.responseBuffer = responseBuffer
+    #__init__
+
+#MsgList
+
+
+class MsgLoadSession(czthreading.Message):
+    """
+    "Session load" command sent by client to server.
+    """
+    def __init__(self, session: str, responseBuffer: queue.Queue):
+        super().__init__()
+        self.session = session
+        self.responseBuffer = responseBuffer
+    #__init__
+
+#MsgList
+
+
+class MsgLoadAll(czthreading.Message):
+    """
+    "Session load all/pending" commands sent by client to server.
+    """
+    def __init__(self, pendingOnly: bool, responseBuffer: queue.Queue):
+        super().__init__()
+        self.pendingOnly = pendingOnly
         self.responseBuffer = responseBuffer
     #__init__
 

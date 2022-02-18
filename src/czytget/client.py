@@ -89,6 +89,16 @@ class Client(czthreading.Thread, cmd.Cmd):
         self.stdout.write("\n")
         self.stdout.write("\nl       list queued and processed codes")
         self.stdout.write("\n")
+        self.stdout.write("\nsls     'Session LS': list previous sessions")
+        self.stdout.write("\n")
+        self.stdout.write("\nsld SESSION [SESSION ...]")
+        self.stdout.write("\n        'Session LoaD': load session SESSION")
+        self.stdout.write("\n")
+        self.stdout.write("\nsla     'Session Load All': load all available sessions")
+        self.stdout.write("\n")
+        self.stdout.write("\nslp     'Session Load Pending': load all available sessions,")
+        self.stdout.write("\n        but only unfinished codes")
+        self.stdout.write("\n")
         self.stdout.write("\nq       terminate the server and the client")
         self.stdout.write("\n")
         return False # on true, prompt loop will end
@@ -106,10 +116,10 @@ class Client(czthreading.Thread, cmd.Cmd):
         if len(codes) == 0:
             self._error("add: YT code expected")
         else:
+            response = queue.Queue(maxsize=1)
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    response = queue.Queue(maxsize=1)
                     self._server.comm(MsgAdd(ytCode, response))
                     self._getResponse(response)
                 else:
@@ -164,6 +174,66 @@ class Client(czthreading.Thread, cmd.Cmd):
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_l
+
+
+    def do_sls(self, args) -> bool:
+        """
+        Implements SESSION LS command.
+        :param args: ignored
+        :return: False
+        """
+        responseBuffer = queue.Queue()
+        self._server.comm(MsgSessionList(responseBuffer))
+        self._getResponse(responseBuffer)
+        return False # on true, prompt loop will end
+    #do_sls
+
+
+    def do_sld(self, args) -> bool:
+        """
+        Implements SESSION LOAD command.
+        :param args: ignored
+        :return: False
+        """
+        sessions = args.split()
+        if len(sessions) == 0:
+            self._error("add: YT code expected")
+        else:
+            response = queue.Queue(maxsize=1)
+            for session in sessions:
+                _logger.info("loading session", session)
+                self._server.comm(MsgLoadSession(session, response))
+                self._getResponse(response)
+            #for
+        #else
+        return False # on true, prompt loop will end
+    #do_sld
+
+
+    def do_sla(self, args) -> bool:
+        """
+        Implements SESSION LOAD ALL command.
+        :param args: ignored
+        :return: False
+        """
+        responseBuffer = queue.Queue()
+        self._server.comm(MsgLoadAll(False, responseBuffer))
+        self._getResponse(responseBuffer)
+        return False # on true, prompt loop will end
+    #do_sls
+
+
+    def do_slp(self, args) -> bool:
+        """
+        Implements SESSION LOAD PENDING command.
+        :param args: ignored
+        :return: False
+        """
+        responseBuffer = queue.Queue()
+        self._server.comm(MsgLoadAll(True, responseBuffer))
+        self._getResponse(responseBuffer)
+        return False # on true, prompt loop will end
+    #do_sls
 
 
     def do_q(self, args) -> bool:

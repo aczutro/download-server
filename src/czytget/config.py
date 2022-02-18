@@ -59,20 +59,41 @@ class ServerConfig:
     Server config:
 
     - numThreads: int: number of worker threads, must be > 0.
+    - dataDir: string: the directory where code files
+                       are read from and stored to; it must exist
     """
     def __init__(self):
         self.numThreads = 4
+        self.dataDir = ""
     #__init__
 
 
     def verify(self) -> None:
         """
-        Checks if all values comply with the specs.
+        Checks if all values comply with the specs.  It also creates the data
+        directory if necessary.
         :raises: ConfigError
         """
         if self.numThreads < 1:
             raise ConfigError("server.numthreads must be > 0")
         #if
+        if not os.path.exists(self.dataDir):
+            try:
+                os.makedirs(self.dataDir, exist_ok=True)
+            except OSError as e:
+                errorString = "ServerConfig: cannot create data dir '%s': %s" \
+                              % (self.dataDir, e)
+                _logger.error(errorString)
+                raise ConfigError(errorString)
+            #except
+        else:
+            if not os.path.isdir(self.dataDir):
+                errorString = "ServerConfig: '%s' exists, but is not a directory" \
+                              % self.dataDir
+                _logger.error(errorString)
+                raise ConfigError(errorString)
+            #if
+        #else
     #check
 
 #ServerConfig
@@ -115,12 +136,16 @@ def _makeDefaultConfig(configFile: str) -> typing.Tuple[ ServerConfig, ClientCon
     serverConfig = ServerConfig()
     clientConfig = ClientConfig()
 
+    serverConfig.dataDir = os.path.dirname(configFile)
+
     configWriter = configparser.ConfigParser()
 
-    configWriter["server"] = { "numthreads" : serverConfig.numThreads }
+    configWriter["server"] = { "numthreads" : serverConfig.numThreads,
+                               "datadir" : serverConfig.dataDir
+                               }
     configWriter["client"] = { "responsetimeout" : clientConfig.responseTimeout }
 
-    os.mkdir(os.path.dirname(configFile))
+    os.makedirs(os.path.dirname(configFile), exist_ok=True)
     with open(configFile, 'w') as configFile:
         configWriter.write(configFile)
     #with
@@ -130,34 +155,36 @@ def _makeDefaultConfig(configFile: str) -> typing.Tuple[ ServerConfig, ClientCon
 #_makeDefaultConfig
 
 
-def parseConfig(configFile: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
+def parseConfig(configDir: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
     """
-    Parses a config file and returns ServerConfig and ClientConfig objects
-    that contain the parsed data.
+    Parses file "config" in directory configDir, and returns
+    ServerConfig and ClientConfig objects that contain the parsed data.
 
-    :param configFile: Full path to config file.  If not an absolute path,
-                       understands it relative to ${HOME}.  If the HOME
-                       environment variable is not defined, understands it
-                       relative to the execution directory.
+    :param configDir: Full path to config directory.  If not an absolute path,
+                      understands it relative to ${HOME}.  If the HOME
+                      environment variable is not defined, understands it
+                      relative to the execution directory.
     :return:
     """
-    configFileFullPath = czsystem.resolveAbsPath(configFile)
-    _logger.info("parsing file", configFileFullPath)
+    configDirFullPath = czsystem.resolveAbsPath(configDir)
+    configFile = os.path.join(configDirFullPath, "config")
+    _logger.info("parsing file", configFile)
 
-    if not os.path.exists(configFileFullPath):
-        return _makeDefaultConfig(configFileFullPath)
+    if not os.path.exists(configFile):
+        return _makeDefaultConfig(configFile)
     #if
 
     serverConfig = None
     clientConfig = None
 
     configReader = configparser.ConfigParser()
-    configReader.read(configFileFullPath)
+    configReader.read(configFile)
 
     if "server" in configReader.sections():
         serverConfig = ServerConfig()
         try:
             serverConfig.numThreads = configReader.getint("server", "numthreads")
+            serverConfig.dataDir = configReader.get("server", "datadir")
             serverConfig.verify()
         except Exception as e:
             raise ConfigError("bad config: %s" % e)
