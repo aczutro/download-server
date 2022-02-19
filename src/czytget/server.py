@@ -15,7 +15,6 @@
 from .config import ServerConfig
 from .messages import *
 from czutils.utils import czlogging, czthreading
-import queue
 import random
 import time
 
@@ -45,7 +44,7 @@ def setLoggingOptions(level: int, colour=True) -> None:
 
 class Worker(czthreading.ReactiveThread):
     """
-
+    A worker thread that processes a YT code on demand.
     """
 
     def __init__(self, threadName: str, server):
@@ -53,43 +52,56 @@ class Worker(czthreading.ReactiveThread):
         self._server = server
         self._free = True
         self.addMessageProcessor("MsgTask", self.processMsgTask)
-
     #__init__
 
 
     def free(self) -> bool:
+        """
+        :returns: True if it is not working.
+        """
         return self._free
-
     #free
 
 
     def processMsgTask(self, message: MsgTask):
+        """
+        Processes the YT code contained in 'message' and sends a MsgAck message
+        back to the server when the processing is finished.
+        """
         self._free = False
         ytCode = message.ytCode
-        success = self._downloadVideo(ytCode)
+        success = self._processCode(ytCode)
         self._server.comm(MsgAck(ytCode, success))
         self._free = True
-
     #processMsgTask
 
 
-    def _downloadVideo(self, ytCode: str) -> bool:
+    def _processCode(self, ytCode: str) -> bool:
         """
-        just simulating
-        """
+        Processes a YT code.
 
+        :returns: True if successful.
+        """
         ans = bool(random.randint(0, 1))
         time.sleep(10 * random.random())
         return ans
-
-    #_downloadVideo
+    #__processCode
 
 #Worker
 
 
 class Server(czthreading.ReactiveThread):
     """
+    Implements a loop that takes commands from a client via messages of the
+    following types:
+        - MsgAck
+        - MsgAdd
+        - MsgList
+        - MsgAllocate
 
+    Some commands expect a server response.  If the command message provides
+    a response buffer (queue.Queue), the server puts the response into that
+    buffer.
     """
 
     def __init__(self, config: ServerConfig):
@@ -100,7 +112,6 @@ class Server(czthreading.ReactiveThread):
         self._queuedCodes = set()
         self._processingCodes = set()
         self._finishedCodes = set()
-        self.serverResponse = queue.Queue(maxsize = 1)
         self.addMessageProcessor("MsgAck", self.processMsgAck)
         self.addMessageProcessor("MsgAdd", self.processMsgAdd)
         self.addMessageProcessor("MsgList", self.processMsgList)
@@ -142,16 +153,27 @@ class Server(czthreading.ReactiveThread):
 
 
     def processMsgAdd(self, message: MsgAdd):
+        """
+        Processes a message of type MsgAdd, i.e. adds message.ytCode to the
+        processing queue and, if message.responseBuffer is not None, puts a
+        response string into it.
+        """
         ytCode = message.ytCode
         if ytCode in self._processingCodes:
-            self.serverResponse.put("YT code '%s' already being processed"
-                                    % message.ytCode)
+            if message.responseBuffer is not None:
+                message.responseBuffer.put("YT code '%s' already being processed"
+                                           % message.ytCode)
+            #if
         elif ytCode in self._finishedCodes:
-            self.serverResponse.put("YT code '%s' already processed"
-                                    % message.ytCode)
+            if message.responseBuffer is not None:
+                message.responseBuffer.put("YT code '%s' already processed"
+                                           % message.ytCode)
+            #if
         else:
+            if message.responseBuffer is not None:
+                message.responseBuffer.put("YT code '%s' queued" % message.ytCode)
+            #if
             self._queuedCodes.add(ytCode)
-            self.serverResponse.put("YT code '%s' queued" % message.ytCode)
             self.comm(MsgAllocate())
         #else
 
@@ -159,6 +181,11 @@ class Server(czthreading.ReactiveThread):
 
 
     def processMsgList(self, message: MsgList):
+        """
+        Processes a message of type MsgList, creates a string listing the
+        contents of the internal code queue and puts the result into
+        'message.responseBuffer'.  'message.responseBuffer' must not be None.
+        """
         response = "queued codes:"
         for ytCode in self._queuedCodes:
             response = "%s\n  %s" % (response, ytCode)
@@ -171,7 +198,7 @@ class Server(czthreading.ReactiveThread):
         for ytCode in self._finishedCodes:
             response = "%s\n  %s" % (response, ytCode)
         #for
-        self.serverResponse.put(response)
+        message.responseBuffer.put(response)
 
     #processMsgList
 

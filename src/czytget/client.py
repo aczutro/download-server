@@ -11,13 +11,12 @@
 ################################################################### aczutro ###
 
 """czytget client"""
-import cmd
-import queue
 
 from .config import ClientConfig
 from .messages import *
 from .server import Server
 from czutils.utils import czlogging, czthreading
+import cmd
 
 
 _logger = czlogging.LoggingChannel("czytget.client",
@@ -110,8 +109,9 @@ class Client(czthreading.Thread, cmd.Cmd):
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    self._server.comm(MsgAdd(ytCode))
-                    self._getResponse()
+                    response = queue.Queue(maxsize=1)
+                    self._server.comm(MsgAdd(ytCode, response))
+                    self._getResponse(response)
                 else:
                     self._error("bad YT code:", ytCode)
                 #else
@@ -159,8 +159,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
-        self._server.comm(MsgList())
-        self._getResponse()
+        responseBuffer = queue.Queue()
+        self._server.comm(MsgList(responseBuffer))
+        self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_l
 
@@ -187,13 +188,15 @@ class Client(czthreading.Thread, cmd.Cmd):
     #_error
 
 
-    def _getResponse(self) -> None:
+    def _getResponse(self, responseBuffer: queue.Queue) -> None:
         """
-        Waits for server response and prints error message in case of timeout.
+        Waits for a message (string) to be put into 'responseBuffer' and prints
+        the message to STDOUT.
+        In case of timeout, prints an error message.
         """
         try:
             self.stdout.write(
-                self._server.serverResponse.get(
+                responseBuffer.get(
                     block = True,
                     timeout = self._config.responseTimeout))
             self.stdout.write("\n")

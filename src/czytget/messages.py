@@ -11,6 +11,7 @@
 ################################################################### aczutro ###
 
 """czytget messages"""
+import queue
 
 from czutils.utils import czthreading
 
@@ -52,9 +53,10 @@ class MsgAdd(czthreading.Message):
     """
     Add command sent by client to server.
     """
-    def __init__(self, ytCode: str):
+    def __init__(self, ytCode: str, responseBuffer: queue.Queue):
         super().__init__()
         self.ytCode = ytCode
+        self.responseBuffer = responseBuffer
     #__init__
 
 #MsgAdd
@@ -64,5 +66,9 @@ class MsgList(czthreading.Message):
     """
     List command sent by client to server.
     """
-    pass
+    def __init__(self, responseBuffer: queue.Queue):
+        super().__init__()
+        self.responseBuffer = responseBuffer
+    #__init__
+
 #MsgList
