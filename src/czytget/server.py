@@ -14,12 +14,12 @@
 
 from .config import ServerConfig
 from .messages import *
+from .ytconnector import YTConnector, mergeCookieFiles
 from czutils.utils import czlogging, czthreading
 import datetime
 import os
 import pickle
-import random
-import time
+import shutil
 
 
 _logger = czlogging.LoggingChannel("czytget.server",
@@ -61,12 +61,27 @@ class Worker(czthreading.ReactiveThread):
     A worker thread that processes a YT code on demand.
     """
 
-    def __init__(self, threadName: str, server):
+    def __init__(self, threadName: str, cookieFile: str, server):
         super().__init__(threadName, 1)
         self._server = server
         self._free = True
         self.addMessageProcessor("MsgTask", self.processMsgTask)
+        self._cookies = cookieFile
+        self._ytdl = YTConnector(cookieFile)
     #__init__
+
+
+    def threadCodePost(self) -> None:
+        self._ytdl.close()
+    #threadCodePost
+
+
+    def cookieFile(self) -> str:
+        """
+        :returns: cookie file name.
+        """
+        return self._cookies
+    #cookieFile
 
 
     def free(self) -> bool:
@@ -96,9 +111,13 @@ class Worker(czthreading.ReactiveThread):
 
         :returns: True if successful.
         """
-        ans = bool(random.randint(0, 1))
-        time.sleep(10 * random.random())
-        return ans
+        successful, errorMsg = self._ytdl.download(ytCode)
+        if successful:
+            _logger.info("[%s] download succeeded:" % ytCode)
+        else:
+            _logger.error("[%s] download failed:" % ytCode, errorMsg)
+        #else
+        return successful
     #__processCode
 
 #Worker
@@ -152,6 +171,19 @@ def _loadFile(filename: str, previous: set) -> set:
 #_loadFile
 
 
+def _copyCookies(src: str, dst:str) -> str:
+    """
+    Copies file 'src' to 'dst' if 'src' exists.
+    :return: 'dst', even if 'src' does not exist.
+    """
+    if os.path.exists(src):
+        return shutil.copyfile(src, dst)
+    else:
+        return dst
+    #else
+#_copyCookies
+
+
 class Server(czthreading.ReactiveThread):
     """
     Implements a loop that takes commands from a client via messages of the
@@ -186,11 +218,16 @@ class Server(czthreading.ReactiveThread):
             _logger.error(errorString)
             raise ServerError(errorString)
         #except
+        self._cookies = config.cookies
         self._finishedFile = os.path.join(self._dataDir, _FINISHED_FILE)
         self._processingFile = os.path.join(self._dataDir, _PROCESSING_FILE)
         self._queuedFile = os.path.join(self._dataDir, _QUEUED_FILE)
-        self._workers = [ Worker("worker-%d" % i, self)
-                          for i in range(config.numThreads) ]
+        self._workers = [
+            Worker("worker-%d" % i,
+                   _copyCookies(self._cookies,
+                                "%s-%d" % (self._cookies, i)),
+                   self)
+            for i in range(config.numThreads) ]
         self._queuedCodes = set()
         self._processingCodes = set()
         self._finishedCodes = set()
@@ -209,16 +246,20 @@ class Server(czthreading.ReactiveThread):
         for worker in self._workers:
             worker.start()
         #for
-
     #threadCodePre
 
 
     def threadCodePost(self):
         print("stopping czytget server")
+        cookieFiles = []
         for worker in self._workers:
+            cookieFiles.append(worker.cookieFile())
             worker.stop()
         #for
-
+        mergeCookieFiles(self._cookies, *cookieFiles)
+        for f in cookieFiles:
+            os.remove(f)
+        #for
     #threadCodePost
 
 

@@ -65,6 +65,7 @@ class ServerConfig:
     def __init__(self):
         self.numThreads = 4
         self.dataDir = ""
+        self.cookies = ""
     #__init__
 
 
@@ -94,7 +95,37 @@ class ServerConfig:
                 raise ConfigError(errorString)
             #if
         #else
+        if os.path.exists(self.cookies):
+            if os.path.isdir(self.cookies):
+                errorString = "ServerConfig: '%s' exists, but is not a directory" \
+                              % self.cookies
+                _logger.error(errorString)
+                raise ConfigError(errorString)
+            #if
+        #if
     #check
+
+
+    def configDict(self) -> dict:
+        """
+        :returns: a dictionary that can be passed to configparser.ConfigParser()
+                  to write this object's contents to file
+        """
+        return { "numthreads" : self.numThreads,
+                 "datadir" : self.dataDir,
+                 "cookies" : self.cookies
+                 }
+    #configDict
+
+
+    def fromConfigParser(self, section: configparser.SectionProxy) -> None:
+        """
+        Reads values from provided section and stores them to member variables.
+        """
+        self.numThreads = section.getint("numthreads")
+        self.dataDir = section.get("datadir")
+        self.cookies = section.get("cookies")
+    #fromConfigParser
 
 #ServerConfig
 
@@ -123,6 +154,23 @@ class ClientConfig:
         #if
     #check
 
+
+    def configDict(self) -> dict:
+        """
+        :returns: a dictionary that can be passed to configparser.ConfigParser()
+                  to write this object's contents to file
+        """
+        return { "responsetimeout" : self.responseTimeout }
+    #configDict
+
+
+    def fromConfigParser(self, section: configparser.SectionProxy) -> None:
+        """
+        Reads values from provided section and stores them to member variables.
+        """
+        self.responseTimeout = section.getfloat("responsetimeout")
+    #fromConfigParser
+
 #ClientConfig
 
 
@@ -134,30 +182,38 @@ def _makeDefaultConfig(configFile: str) -> typing.Tuple[ ServerConfig, ClientCon
               written to file.
     """
     serverConfig = ServerConfig()
+    serverConfig.dataDir = os.path.dirname(configFile)
+    serverConfig.cookies = os.path.join(serverConfig.dataDir, ".cookies")
+
     clientConfig = ClientConfig()
 
-    serverConfig.dataDir = os.path.dirname(configFile)
+    writeConfig(configFile, serverConfig, clientConfig)
 
+    return serverConfig, clientConfig
+#_makeDefaultConfig
+
+
+def writeConfig(configFile: str,
+                serverConfig: ServerConfig,
+                clientConfig: ClientConfig) -> None:
+    """
+    Writes configurations to file.
+    """
     configWriter = configparser.ConfigParser()
 
-    configWriter["server"] = { "numthreads" : serverConfig.numThreads,
-                               "datadir" : serverConfig.dataDir
-                               }
-    configWriter["client"] = { "responsetimeout" : clientConfig.responseTimeout }
+    configWriter["server"] = serverConfig.configDict()
+    configWriter["client"] = clientConfig.configDict()
 
     os.makedirs(os.path.dirname(configFile), exist_ok=True)
     with open(configFile, 'w') as configFile:
         configWriter.write(configFile)
     #with
-
-    return serverConfig, clientConfig
-
-#_makeDefaultConfig
+#writeConfig
 
 
-def parseConfig(configDir: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
+def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
     """
-    Parses file "config" in directory configDir, and returns
+    Parses file '.config' in directory configDir, and returns
     ServerConfig and ClientConfig objects that contain the parsed data.
 
     :param configDir: Full path to config directory.  If not an absolute path,
@@ -167,7 +223,7 @@ def parseConfig(configDir: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
     :return:
     """
     configDirFullPath = czsystem.resolveAbsPath(configDir)
-    configFile = os.path.join(configDirFullPath, "config")
+    configFile = os.path.join(configDirFullPath, ".config")
     _logger.info("parsing file", configFile)
 
     if not os.path.exists(configFile):
@@ -183,8 +239,7 @@ def parseConfig(configDir: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
     if "server" in configReader.sections():
         serverConfig = ServerConfig()
         try:
-            serverConfig.numThreads = configReader.getint("server", "numthreads")
-            serverConfig.dataDir = configReader.get("server", "datadir")
+            serverConfig.fromConfigParser(configReader["server"])
             serverConfig.verify()
         except Exception as e:
             raise ConfigError("bad config: %s" % e)
@@ -194,7 +249,7 @@ def parseConfig(configDir: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
     if "client" in configReader.sections():
         clientConfig = ClientConfig()
         try:
-            clientConfig.responseTimeout = configReader.getfloat("client", "responsetimeout")
+            clientConfig.fromConfigParser(configReader["client"])
             clientConfig.verify()
         except Exception as e:
             raise ConfigError("bad config: %s" % e)

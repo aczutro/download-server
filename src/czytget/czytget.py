@@ -15,6 +15,7 @@
 from .config import parseConfig, setLoggingOptions as setLoggingOptionsConfig
 from .server import Server, setLoggingOptions as setLoggingOptionsServer
 from .client import Client, setLoggingOptions as setLoggingOptionsClient
+from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 
@@ -29,7 +30,8 @@ def main():
     #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
-    setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
         serverConfig, clientConfig = parseConfig(".config/czytget")
@@ -44,15 +46,12 @@ def main():
 
         server.wait()
         client.wait()
+
         sys.exit(0)
-    except AssertionError as e:
-        raise e
-    # except ServerError as e:
-    #     logger.error(e)
-    #     sys.exit(1)
     except Exception as e:
-        logger.error(e)
-        sys.exit(2)
+       logger.error("unexpected exception:", e)
+       #raise e
+       sys.exit(2)
     #except
 #autoStr
 
