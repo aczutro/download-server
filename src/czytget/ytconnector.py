@@ -11,9 +11,11 @@
 ################################################################### aczutro ###
 
 """interface to yt downloading library"""
-import logging
 
 from czutils.utils import czlogging, czcode
+import contextlib
+import io
+import logging
 import yt_dlp
 
 
@@ -150,6 +152,64 @@ class YTConnector:
     #download
 
 #YTConnector
+
+
+def _filter(lines: list):
+    """
+    Returns all yt codes contained in lines.
+
+    This greps for "Available formats for" to single out lines of the form
+    "[info] Available formats for g2Tm7WZ1jPs:".
+    Then extracts the code (the last word minus the colon).
+    """
+    for line in lines:
+        if "Available formats for" in line:
+            yield line.split()[-1][:-1]
+        #if
+    #for
+#_filter
+
+
+def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
+    """
+    Treats 'ytCode' like a playlist and extract the codes of all individual
+    videos.  Returns them as a set.
+
+    :returns: If successful, returns [ <code set>, "" ].
+              Else, [ None, <error description> ].
+    """
+    ydlOptions = { "no_color": True,
+                   "listformats": True,
+                   "encoding": "utf-8",
+                   #"cookiefile": cookies
+                   }
+    formatInfo =io.StringIO()
+    exitCode = 1
+    try:
+        with contextlib.redirect_stdout(formatInfo):
+            with yt_dlp.YoutubeDL(ydlOptions) as ytdl:
+                exitCode = ytdl.download([ytCode])
+            #with
+        #with
+    except yt_dlp.utils.YoutubeDLError as e:
+        _logger.warning("yt_dlp failed to download %s:" % ytCode, e)
+        return None, str(e)
+    #except
+
+    if exitCode != 0:
+        _logger.warning("yt_dlp failed to download", ytCode)
+        return None, "unknown yt_dlp failure"
+    #if
+
+    codes = set(_filter(formatInfo.getvalue().split(sep='\n')))
+
+    if len(codes):
+        return codes, ""
+    else:
+        return None, \
+               "yt_dlp successfully extracted list info, but no codes found in it"
+    #else
+#getYTList
 
 
 def mergeCookieFiles(outputFile: str, *filenames) -> None:
