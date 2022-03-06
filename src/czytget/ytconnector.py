@@ -40,21 +40,48 @@ def setLoggingOptions(level: int, colour=True) -> None:
 #setLoggingOptions
 
 
+class _YTLogger(logging.Logger):
+    """
+    A logger to pass to yt_dlp.
+    """
+
+    def __init__(self):
+        super().__init__("yt_dlp", level=logging.NOTSET)
+        self._logger = czlogging.LoggingChannel("ytdlp",
+                                                czlogging.LoggingLevel.INFO,
+                                                colour=True)
+    #__init__
+
+    def info(self, msg, *args, **kwargs):
+        self._logger.info(msg)
+    #info
+
+    def warning(self, msg, *args, **kwargs):
+        self._logger.warning(msg)
+    #warning
+
+    def error(self, msg, *args, **kwargs):
+        self._logger.error(msg)
+    #error
+
+#_YTLogger
+
+
 class YTConnector:
     """
     Interface to yt downloading library.
     """
 
-    def __init__(self, cookiesFile: str):
-        ydlLogger = logging.Logger("yt_dlp", level=logging.NOTSET)
+    def __init__(self, cookies: str):
         ydlOptions = { "quiet": True,
                        "no_warnings": True,
                        "no_color": True,
                        "restrictfilenames": True,
+                       "windowsfilenames": True,
                        "writedescription": True,
-                       "logger": ydlLogger,
+                       "logger": _YTLogger(),
                        "logtostderr": True,
-                       "cookiefile": cookiesFile }
+                       "cookiefile": cookies }
         self._ydl = yt_dlp.YoutubeDL(ydlOptions)
     #__init__
 
@@ -94,8 +121,8 @@ class YTConnector:
         """
         Downloads a YT code.
         :param ytCode: a valid YT code
-        :return: [ True, "" ] if successful,
-                 or [ False, error description ] else.
+        :return: If successful, [ True, "" ].
+                 Else, [ False, <error description> ].
         """
         try:
             exitCode = self._ydl.download([ytCode])
