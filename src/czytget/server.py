@@ -149,7 +149,7 @@ def _dumpFile(filename: str, q: set):
 #_dumpFile
 
 
-def _loadFile(filename: str, previous: set) -> set:
+def _loadFile(filename: str) -> set:
     if os.path.exists(filename):
         try:
             with open(filename, "rb") as f:
@@ -161,13 +161,15 @@ def _loadFile(filename: str, previous: set) -> set:
             raise ServerError("ERROR: failed to read data file '%s': %s"
                               % (filename, e))
         #except
-        if type(data) != set:
+        if type(data) == set:
+            return data
+        else:
             _logger.error("Server: corrupted data file '%s'" % filename)
             raise ServerError("ERROR: corrupted data file '%s'" % filename)
-        else:
-            return previous.union(data)
         #else
-    #if
+    else:
+        return set()
+    #else
 #_loadFile
 
 
@@ -358,13 +360,10 @@ class Server(czthreading.ReactiveThread):
         if not os.path.exists(session):
             raise ServerError("ERROR: session '%s' does not exist" % session)
         #if
-        self._queuedCodes = _loadFile(
-            os.path.join(session, _PROCESSING_FILE), self._queuedCodes)
-        self._queuedCodes = _loadFile(
-            os.path.join(session, _QUEUED_FILE), self._queuedCodes)
+        self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
+        self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
         if finishedToo:
-            self._finishedCodes = _loadFile(
-                os.path.join(session, _FINISHED_FILE), self._finishedCodes)
+            self._finishedCodes.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
         #if
     #_loadSession
 
