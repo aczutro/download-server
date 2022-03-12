@@ -125,6 +125,16 @@ class ServerConfig:
         self.numThreads = section.getint("numthreads")
         self.dataDir = section.get("datadir")
         self.cookies = section.get("cookies")
+
+        if self.numThreads is None:
+            raise ConfigError("field 'numthreads' not found")
+        #if
+        if self.dataDir is None:
+            raise ConfigError("field 'datadir' not found")
+        #if
+        if self.cookies is None:
+            raise ConfigError("field 'cookies' not found")
+        #if
     #fromConfigParser
 
 #ServerConfig
@@ -169,6 +179,10 @@ class ClientConfig:
         Reads values from provided section and stores them to member variables.
         """
         self.responseTimeout = section.getfloat("responsetimeout")
+
+        if self.responseTimeout is None:
+            raise ConfigError("field 'responsetimeout' not found")
+        #if
     #fromConfigParser
 
 #ClientConfig
@@ -242,7 +256,7 @@ def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
             serverConfig.fromConfigParser(configReader["server"])
             serverConfig.verify()
         except Exception as e:
-            raise ConfigError("bad config: %s" % e)
+            raise ConfigError("bad server config: %s" % e)
         #except
     #if
 
@@ -252,7 +266,7 @@ def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
             clientConfig.fromConfigParser(configReader["client"])
             clientConfig.verify()
         except Exception as e:
-            raise ConfigError("bad config: %s" % e)
+            raise ConfigError("bad client config: %s" % e)
         #except
     #if
 

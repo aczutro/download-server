@@ -12,7 +12,7 @@
 
 """A simple server to execute multiple parallel download jobs."""
 
-from .config import parseConfig, setLoggingOptions as setLoggingOptionsConfig
+from .config import parseConfig, ConfigError, setLoggingOptions as setLoggingOptionsConfig
 from .server import Server, setLoggingOptions as setLoggingOptionsServer
 from .client import Client, setLoggingOptions as setLoggingOptionsClient
 from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector, getYTList
@@ -56,10 +56,13 @@ def main():
         client.wait()
 
         sys.exit(0)
+    except ConfigError as e:
+        logger.error(e)
+        sys.exit(1)
     except Exception as e:
        logger.error("unexpected exception:", e)
-       raise e
-       #sys.exit(2)
+       #raise e
+       sys.exit(2)
     #except
 #autoStr
 
