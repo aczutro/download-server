@@ -368,18 +368,18 @@ class Server(czthreading.ReactiveThread):
         'message.responseBuffer'.  'message.responseBuffer' must not be None.
         """
         message.responseBuffer.put('\n'.join([ s for s in [
-            _printQueue(self._queuedCodes,
-                        cztext.colourise("queued codes:",
-                                         foreground=cztext.Col16.YELLOW)),
-            _printQueue(self._processingCodes,
-                        cztext.colourise("codes in process:",
-                                         foreground=cztext.Col16.BLUE)),
             _printQueue(self._finishedCodes,
                         cztext.colourise("finished codes:",
                                          foreground=cztext.Col16.GREEN)),
             _printQueue(self._failedCodes,
                         cztext.colourise("failed codes:",
-                                         foreground=cztext.Col16.RED))
+                                         foreground=cztext.Col16.RED)),
+            _printQueue(self._processingCodes,
+                        cztext.colourise("codes in process:",
+                                         foreground=cztext.Col16.BLUE)),
+            _printQueue(self._queuedCodes,
+                        cztext.colourise("queued codes:",
+                                         foreground=cztext.Col16.YELLOW))
         ] if len(s) ]))
     #processMsgList
 
