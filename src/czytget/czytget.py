@@ -15,7 +15,7 @@
 from .config import parseConfig, setLoggingOptions as setLoggingOptionsConfig
 from .server import Server, setLoggingOptions as setLoggingOptionsServer
 from .client import Client, setLoggingOptions as setLoggingOptionsClient
-from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector
+from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector, getYTList
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 
@@ -25,16 +25,24 @@ def main():
     Main routine of the czytget daemon/server.
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
-                                      czlogging.LoggingLevel.WARNING)
+                                      czlogging.LoggingLevel.INFO)
     #czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
     #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
+    setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
-        serverConfig, clientConfig = parseConfig(".config/czytget")
+        # codes, err = getYTList("PL08HmxJqBjBC5KMOsuIUoOn5vtv51NR9N", "")
+        #
+        # if codes is None:
+        #     logger.error(err)
+        # else:
+        #     logger.info(codes)
+        # #else
+
+        serverConfig, clientConfig = parseConfig(".config/.czytget")
         logger.info(serverConfig)
         logger.info(clientConfig)
 
@@ -50,8 +58,8 @@ def main():
         sys.exit(0)
     except Exception as e:
        logger.error("unexpected exception:", e)
-       #raise e
-       sys.exit(2)
+       raise e
+       #sys.exit(2)
     #except
 #autoStr
 

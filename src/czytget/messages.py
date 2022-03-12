@@ -62,6 +62,14 @@ class MsgAdd(czthreading.Message):
 #MsgAdd
 
 
+class MsgRetry(czthreading.Message):
+    """
+    Retry command sent by client to server.
+    """
+    pass
+#MsgRetry
+
+
 class MsgList(czthreading.Message):
     """
     List command sent by client to server.

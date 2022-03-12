@@ -123,11 +123,12 @@ class Worker(czthreading.ReactiveThread):
 #Worker
 
 
+_FAILED_FILE = "failed.pkl"
 _FINISHED_FILE = "finished.pkl"
 _PROCESSING_FILE = "processing.pkl"
 _QUEUED_FILE = "queued.pkl"
 
-_FILE_CANDIDATES = ( _FINISHED_FILE, _PROCESSING_FILE, _QUEUED_FILE )
+_FILE_CANDIDATES = ( _FAILED_FILE, _FINISHED_FILE, _PROCESSING_FILE, _QUEUED_FILE )
 
 
 def _getSubdirs(root: str) -> list[str]:
@@ -186,6 +187,18 @@ def _copyCookies(src: str, dst:str) -> str:
 #_copyCookies
 
 
+def _printQueue(q: set, label: str) -> str:
+    response = ""
+    if len(q):
+        response = label
+        for ytCode in q:
+            response = "%s\n  %s" % (response, ytCode)
+        #for
+    #if
+    return response
+#_printQueue
+
+
 class Server(czthreading.ReactiveThread):
     """
     Implements a loop that takes commands from a client via messages of the
@@ -208,6 +221,7 @@ class Server(czthreading.ReactiveThread):
         :raises: ServerError
         """
         super().__init__('czytget-server', 1)
+
         self._dataDir \
             = os.path.join(config.dataDir,
                            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -220,21 +234,29 @@ class Server(czthreading.ReactiveThread):
             _logger.error(errorString)
             raise ServerError(errorString)
         #except
+
         self._cookies = config.cookies
-        self._finishedFile = os.path.join(self._dataDir, _FINISHED_FILE)
-        self._processingFile = os.path.join(self._dataDir, _PROCESSING_FILE)
-        self._queuedFile = os.path.join(self._dataDir, _QUEUED_FILE)
+
         self._workers = [
             Worker("worker-%d" % i,
                    _copyCookies(self._cookies,
                                 "%s-%d" % (self._cookies, i)),
                    self)
             for i in range(config.numThreads) ]
+
+        self._failedFile = os.path.join(self._dataDir, _FAILED_FILE)
+        self._finishedFile = os.path.join(self._dataDir, _FINISHED_FILE)
+        self._processingFile = os.path.join(self._dataDir, _PROCESSING_FILE)
+        self._queuedFile = os.path.join(self._dataDir, _QUEUED_FILE)
+
+        self._failedCodes = set()
         self._queuedCodes = set()
         self._processingCodes = set()
         self._finishedCodes = set()
+
         self.addMessageProcessor("MsgAck", self.processMsgAck)
         self.addMessageProcessor("MsgAdd", self.processMsgAdd)
+        self.addMessageProcessor("MsgRetry", self.processMsgRetry)
         self.addMessageProcessor("MsgList", self.processMsgList)
         self.addMessageProcessor("MsgAllocate", self.processMsgAllocate)
         self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
@@ -273,7 +295,7 @@ class Server(czthreading.ReactiveThread):
         if success:
             self._finishedCodes.add(ytCode)
         else:
-            self._queuedCodes.add(ytCode)
+            self._failedCodes.add(ytCode)
         #if
         self._dumpAll()
         self.comm(MsgAllocate())
@@ -309,26 +331,31 @@ class Server(czthreading.ReactiveThread):
     #processMsgAdd
 
 
+    def processMsgRetry(self, message: MsgRetry):
+        """
+        Processes a message of type MsgRetry, i.e. moves all failed code back
+        to the processing queue.
+        """
+        self._queuedCodes.update(self._failedCodes)
+        self._failedCodes.clear()
+        self._dumpQueued()
+        self._dumpFailed()
+        self.comm(MsgAllocate())
+    #processMsgRetry
+
+
     def processMsgList(self, message: MsgList):
         """
         Processes a message of type MsgList, creates a string listing the
         contents of the internal code queue and puts the result into
         'message.responseBuffer'.  'message.responseBuffer' must not be None.
         """
-        response = "queued codes:"
-        for ytCode in self._queuedCodes:
-            response = "%s\n  %s" % (response, ytCode)
-        #for
-        response = "%s\ncodes in process:" % response
-        for ytCode in self._processingCodes:
-            response = "%s\n  %s" % (response, ytCode)
-        #for
-        response = "%s\nfinished codes:" % response
-        for ytCode in self._finishedCodes:
-            response = "%s\n  %s" % (response, ytCode)
-        #for
-        message.responseBuffer.put(response)
-
+        message.responseBuffer.put('\n'.join([ s for s in [
+            _printQueue(self._queuedCodes, "queued codes:"),
+            _printQueue(self._processingCodes, "codes in process:"),
+            _printQueue(self._finishedCodes, "finished codes:"),
+            _printQueue(self._failedCodes, "failed codes:"),
+        ] if len(s) ]))
     #processMsgList
 
 
@@ -362,6 +389,7 @@ class Server(czthreading.ReactiveThread):
         #if
         self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
         self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
+        self._failedCodes.update(_loadFile(os.path.join(session, _FAILED_FILE)))
         if finishedToo:
             self._finishedCodes.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
         #if
@@ -404,16 +432,11 @@ class Server(czthreading.ReactiveThread):
     #processMsgLoadAll
 
 
-    # def process(self, message: Msg):
-    #     pass
-    #
-    # #process
-
-
     def _dumpAll(self):
         self._dumpQueued()
         self._dumpProcessing()
         self._dumpFinished()
+        self._dumpFailed()
     #_dumpAll
 
     def _dumpFinished(self):
@@ -427,6 +450,10 @@ class Server(czthreading.ReactiveThread):
     def _dumpQueued(self):
         _dumpFile(self._queuedFile, self._queuedCodes)
     #_dumpQueued
+
+    def _dumpFailed(self):
+        _dumpFile(self._failedFile, self._failedCodes)
+    #_dumpFailed
 
 #Server
 
