@@ -66,6 +66,7 @@ class ServerConfig:
         self.numThreads = 4
         self.dataDir = ""
         self.cookies = ""
+        self.descriptions = True
     #__init__
 
 
@@ -113,7 +114,8 @@ class ServerConfig:
         """
         return { "numthreads" : self.numThreads,
                  "datadir" : self.dataDir,
-                 "cookies" : self.cookies
+                 "cookies" : self.cookies,
+                 "descriptions" : self.descriptions
                  }
     #configDict
 
@@ -125,6 +127,7 @@ class ServerConfig:
         self.numThreads = section.getint("numthreads")
         self.dataDir = section.get("datadir")
         self.cookies = section.get("cookies")
+        self.descriptions = section.getboolean("descriptions")
 
         if self.numThreads is None:
             raise ConfigError("field 'numthreads' not found")
@@ -134,6 +137,9 @@ class ServerConfig:
         #if
         if self.cookies is None:
             raise ConfigError("field 'cookies' not found")
+        #if
+        if self.descriptions is None:
+            raise ConfigError("field 'descriptions' not found")
         #if
     #fromConfigParser
 

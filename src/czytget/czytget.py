@@ -15,7 +15,7 @@
 from .config import parseConfig, ConfigError, setLoggingOptions as setLoggingOptionsConfig
 from .server import Server, setLoggingOptions as setLoggingOptionsServer
 from .client import Client, setLoggingOptions as setLoggingOptionsClient
-from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector, getYTList
+from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 

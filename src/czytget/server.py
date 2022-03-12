@@ -14,7 +14,7 @@
 
 from .config import ServerConfig
 from .messages import *
-from .ytconnector import YTConnector, mergeCookieFiles
+from .ytconnector import YTConnector, mergeCookieFiles, YTConfig
 from czutils.utils import czlogging, czthreading
 import datetime
 import os
@@ -61,13 +61,13 @@ class Worker(czthreading.ReactiveThread):
     A worker thread that processes a YT code on demand.
     """
 
-    def __init__(self, threadName: str, cookieFile: str, server):
+    def __init__(self, threadName: str, ytConfig: YTConfig, server):
         super().__init__(threadName, 1)
         self._server = server
         self._free = True
         self.addMessageProcessor("MsgTask", self.processMsgTask)
-        self._cookies = cookieFile
-        self._ytdl = YTConnector(cookieFile)
+        self._cookies = ytConfig.cookies
+        self._ytdl = YTConnector(ytConfig)
     #__init__
 
 
@@ -174,16 +174,21 @@ def _loadFile(filename: str) -> set:
 #_loadFile
 
 
-def _copyCookies(src: str, dst:str) -> str:
+def _makeYTConfig(srcCookieFile: str, dstCookieFile:str, descriptions: bool) \
+        -> YTConfig:
     """
     Copies file 'src' to 'dst' if 'src' exists.
-    :return: 'dst', even if 'src' does not exist.
+    Then adds 'dst' to the returned YT config, even if 'src' does not exist.
+
+    :returns: a YTConfig
     """
-    if os.path.exists(src):
-        return shutil.copyfile(src, dst)
-    else:
-        return dst
-    #else
+    if os.path.exists(srcCookieFile):
+        shutil.copyfile(srcCookieFile, dstCookieFile)
+    #if
+    ans = YTConfig()
+    ans.cookies = dstCookieFile
+    ans.descriptions = descriptions
+    return ans
 #_copyCookies
 
 
@@ -239,8 +244,9 @@ class Server(czthreading.ReactiveThread):
 
         self._workers = [
             Worker("worker-%d" % i,
-                   _copyCookies(self._cookies,
-                                "%s-%d" % (self._cookies, i)),
+                   _makeYTConfig(self._cookies,
+                                 "%s-%d" % (self._cookies, i),
+                                 config.descriptions),
                    self)
             for i in range(config.numThreads) ]
 

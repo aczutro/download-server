@@ -13,7 +13,7 @@
 """interface to yt downloading library"""
 import logging
 
-from czutils.utils import czlogging
+from czutils.utils import czlogging, czcode
 import yt_dlp
 
 
@@ -67,21 +67,31 @@ class _YTLogger(logging.Logger):
 #_YTLogger
 
 
+@czcode.autoStr
+class YTConfig:
+    def __self__(self):
+        self.cookies = ""
+        self.descriptions = True
+    #__self__
+
+#YTConfig
+
+
 class YTConnector:
     """
     Interface to yt downloading library.
     """
 
-    def __init__(self, cookies: str):
+    def __init__(self, config: YTConfig):
         ydlOptions = { "quiet": True,
                        "no_warnings": True,
                        "no_color": True,
                        "restrictfilenames": True,
                        "windowsfilenames": True,
-                       "writedescription": True,
+                       "writedescription": config.descriptions,
                        "logger": _YTLogger(),
                        "logtostderr": True,
-                       "cookiefile": cookies }
+                       "cookiefile": config.cookies }
         self._ydl = yt_dlp.YoutubeDL(ydlOptions)
     #__init__
 
@@ -164,7 +174,10 @@ def mergeCookieFiles(outputFile: str, *filenames) -> None:
             #with
         #for
     #with
-    with YTConnector(outputFile):
+    ytConfig = YTConfig()
+    ytConfig.cookies = outputFile
+    ytConfig.descriptions = False
+    with YTConnector(ytConfig):
         pass
     #with
 #mergeCookieFiles
