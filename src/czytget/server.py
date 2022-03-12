@@ -15,7 +15,7 @@
 from .config import ServerConfig
 from .messages import *
 from .ytconnector import YTConnector, mergeCookieFiles, YTConfig
-from czutils.utils import czlogging, czthreading
+from czutils.utils import czlogging, czthreading, cztext
 import datetime
 import os
 import pickle
@@ -263,6 +263,7 @@ class Server(czthreading.ReactiveThread):
         self.addMessageProcessor("MsgAck", self.processMsgAck)
         self.addMessageProcessor("MsgAdd", self.processMsgAdd)
         self.addMessageProcessor("MsgRetry", self.processMsgRetry)
+        self.addMessageProcessor("MsgDiscard", self.processMsgDiscard)
         self.addMessageProcessor("MsgList", self.processMsgList)
         self.addMessageProcessor("MsgAllocate", self.processMsgAllocate)
         self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
@@ -350,6 +351,16 @@ class Server(czthreading.ReactiveThread):
     #processMsgRetry
 
 
+    def processMsgDiscard(self, message: MsgDiscard):
+        """
+        Processes a message of type MsgRetry, i.e. moves all failed code back
+        to the processing queue.
+        """
+        self._failedCodes.clear()
+        self._dumpFailed()
+    #processMsgDiscard
+
+
     def processMsgList(self, message: MsgList):
         """
         Processes a message of type MsgList, creates a string listing the
@@ -357,10 +368,18 @@ class Server(czthreading.ReactiveThread):
         'message.responseBuffer'.  'message.responseBuffer' must not be None.
         """
         message.responseBuffer.put('\n'.join([ s for s in [
-            _printQueue(self._queuedCodes, "queued codes:"),
-            _printQueue(self._processingCodes, "codes in process:"),
-            _printQueue(self._finishedCodes, "finished codes:"),
-            _printQueue(self._failedCodes, "failed codes:"),
+            _printQueue(self._queuedCodes,
+                        cztext.colourise("queued codes:",
+                                         foreground=cztext.Col16.YELLOW)),
+            _printQueue(self._processingCodes,
+                        cztext.colourise("codes in process:",
+                                         foreground=cztext.Col16.BLUE)),
+            _printQueue(self._finishedCodes,
+                        cztext.colourise("finished codes:",
+                                         foreground=cztext.Col16.GREEN)),
+            _printQueue(self._failedCodes,
+                        cztext.colourise("failed codes:",
+                                         foreground=cztext.Col16.RED))
         ] if len(s) ]))
     #processMsgList
 

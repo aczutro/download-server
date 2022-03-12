@@ -91,6 +91,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         self.stdout.write("\n")
         self.stdout.write("\nr       retry: queue all failed codes again")
         self.stdout.write("\n")
+        self.stdout.write("\nd       discard: empty the queue of failed codes")
+        self.stdout.write("\n")
         self.stdout.write("\nsls     'Session LS': list previous sessions")
         self.stdout.write("\n")
         self.stdout.write("\nsld SESSION [SESSION ...]")
@@ -173,7 +175,18 @@ class Client(czthreading.Thread, cmd.Cmd):
         """
         self._server.comm(MsgRetry())
         return False # on true, prompt loop will end
-    #do_l
+    #do_r
+
+
+    def do_d(self, args) -> bool:
+        """
+        Implements RETRY command.
+        :param args: ignored
+        :return: False
+        """
+        self._server.comm(MsgDiscard())
+        return False # on true, prompt loop will end
+    #do_d
 
 
     def do_l(self, args) -> bool:

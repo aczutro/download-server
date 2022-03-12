@@ -48,7 +48,7 @@ class _YTLogger(logging.Logger):
     def __init__(self):
         super().__init__("yt_dlp", level=logging.NOTSET)
         self._logger = czlogging.LoggingChannel("ytdlp",
-                                                czlogging.LoggingLevel.INFO,
+                                                czlogging.LoggingLevel.ERROR,
                                                 colour=True)
     #__init__
 

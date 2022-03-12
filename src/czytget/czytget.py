@@ -25,13 +25,13 @@ def main():
     Main routine of the czytget daemon/server.
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
-                                      czlogging.LoggingLevel.INFO)
+                                      czlogging.LoggingLevel.WARNING)
     #czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
     #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
     #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
-    setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
         # codes, err = getYTList("PL08HmxJqBjBC5KMOsuIUoOn5vtv51NR9N", "")
@@ -42,7 +42,7 @@ def main():
         #     logger.info(codes)
         # #else
 
-        serverConfig, clientConfig = parseConfig(".config/.czytget")
+        serverConfig, clientConfig = parseConfig(".config/czytget")
         logger.info(serverConfig)
         logger.info(clientConfig)
 

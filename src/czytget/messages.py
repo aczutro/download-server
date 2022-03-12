@@ -70,6 +70,14 @@ class MsgRetry(czthreading.Message):
 #MsgRetry
 
 
+class MsgDiscard(czthreading.Message):
+    """
+    Discard command sent by client to server.
+    """
+    pass
+#MsgDiscard
+
+
 class MsgList(czthreading.Message):
     """
     List command sent by client to server.
