@@ -71,6 +71,13 @@ class _YTLogger(logging.Logger):
 
 @czcode.autoStr
 class YTConfig:
+    """
+    Configuration passed to YTConnector:
+
+    - cookies: path to the cookies file.
+    - descriptions: if True, download descriptions.
+    """
+
     def __self__(self):
         self.cookies = ""
         self.descriptions = True
@@ -81,7 +88,12 @@ class YTConfig:
 
 class YTConnector:
     """
-    Interface to yt downloading library.
+    Interface to yt downloading library (currently yt_dlp).
+
+    It needs to be instantiated in a 'with' statement in order to ensure that
+    the cookie file is written correctly on exit.  Alternatively, call close()
+    to force the closing of the back-end library (and thus the writing of the
+    cookie file).
     """
 
     def __init__(self, config: YTConfig):
@@ -116,8 +128,8 @@ class YTConnector:
     def close(self) -> None:
         """
         Closes the downloader, in particular forcing it to write the
-        cookies file.  Not necessary if the YTConnector object is instantiated
-        in a with statement.
+        cookie file.  Not necessary if the YTConnector object is instantiated
+        in a 'with' statement.
 
         DO NOT use download(...) after this.
         """
@@ -132,7 +144,7 @@ class YTConnector:
     def download(self, ytCode: str) -> tuple[int, str]:
         """
         Downloads a YT code.
-        :param ytCode: a valid YT code
+        :param ytCode: a valid YT code (individual video)
         :return: If successful, [ True, "" ].
                  Else, [ False, <error description> ].
         """
@@ -156,7 +168,7 @@ class YTConnector:
 
 def _filter(lines: list):
     """
-    Returns all yt codes contained in lines.
+    Returns all yt codes contained in 'lines'.
 
     This greps for "Available formats for" to single out lines of the form
     "[info] Available formats for g2Tm7WZ1jPs:".
@@ -173,7 +185,7 @@ def _filter(lines: list):
 def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
     """
     Treats 'ytCode' like a playlist and extract the codes of all individual
-    videos.  Returns them as a set.
+    videos.  Returns the codes as a set.
 
     :returns: If successful, returns [ <code set>, "" ].
               Else, [ None, <error description> ].

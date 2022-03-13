@@ -21,7 +21,7 @@ import sys
 
 def main():
     """
-    Main routine of the czytget daemon/server.
+    Main routine of the integrated czytget server/client.
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)

@@ -43,6 +43,13 @@ def setLoggingOptions(level: int, colour=True) -> None:
 
 
 class Client(czthreading.Thread, cmd.Cmd):
+    """
+    An "integrated" czytget client that talks directly with the server via
+    message passing (without additional protocol).  Meant to run in the same
+    process as the server.
+
+    Offers a basic shell (command prompt loop).
+    """
 
     def __init__(self, config: ClientConfig, server: Server):
         super().__init__("czytget-client")

@@ -47,7 +47,7 @@ def setLoggingOptions(level: int, colour=True) -> None:
 
 class ServerError(Exception):
     """
-    Exception class thrown by parseConfig
+    Exception class thrown by Server
     """
     def __init__(self, what: str):
         super().__init__(what)
@@ -132,13 +132,20 @@ _FILE_CANDIDATES = ( _FAILED_FILE, _FINISHED_FILE, _PROCESSING_FILE, _QUEUED_FIL
 
 
 def _getSubdirs(root: str) -> list[str]:
+    """
+    Returns a list of subdirectories of 'root' that contain at least one of
+    the files in _FILE_CANDIDATES.
+    """
     return sorted(list([ os.path.basename(direc) \
                          for direc, subdirs, files in os.walk(root) \
                          if len(set(files).intersection(_FILE_CANDIDATES)) ]))
 #_getSubDirs
 
 
-def _dumpFile(filename: str, q: set):
+def _dumpFile(filename: str, q: set) -> None:
+    """
+    Writes the contents of q to file.
+    """
     try:
         with open(filename, "wb") as f:
             pickle.dump(q, f)
@@ -151,6 +158,9 @@ def _dumpFile(filename: str, q: set):
 
 
 def _loadFile(filename: str) -> set:
+    """
+    Load a data file and returns the loaded data as a set of codes.
+    """
     if os.path.exists(filename):
         try:
             with open(filename, "rb") as f:
@@ -206,13 +216,7 @@ def _printQueue(q: set, label: str) -> str:
 
 class Server(czthreading.ReactiveThread):
     """
-    Implements a loop that takes commands from a client via messages of the
-    following types:
-        - MsgAck
-        - MsgAdd
-        - MsgList
-        - MsgAllocate
-        - MsgDateList
+    Implements a loop that takes commands from a client via message passing.
 
     Some commands expect a server response.  If the command message provides
     a response buffer (queue.Queue), the server puts the response into that
@@ -221,8 +225,6 @@ class Server(czthreading.ReactiveThread):
 
     def __init__(self, config: ServerConfig):
         """
-        Constructor.
-
         :raises: ServerError
         """
         super().__init__('czytget-server', 1)

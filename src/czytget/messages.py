@@ -10,7 +10,9 @@
 #
 ################################################################### aczutro ###
 
-"""czytget messages"""
+"""
+Messages sent between server and client, and server and its worker threads.
+"""
 
 from czutils.utils import czthreading
 import queue
