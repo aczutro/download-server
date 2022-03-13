@@ -307,7 +307,9 @@ class Client(czthreading.Thread, cmd.Cmd):
             self.stdout.write(
                 responseBuffer.get(
                     block = True,
-                    timeout = self._config.responseTimeout))
+                    timeout = self._config.longResponseTimeout \
+                        if multiLine else self._config.responseTimeout
+                ))
             self.stdout.write("\n")
         except queue.Empty:
             self._error("server response timeout")

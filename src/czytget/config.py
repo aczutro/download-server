@@ -153,15 +153,32 @@ class ClientConfig:
     """
     Client config
 
-    - responseTimeout: float: maximum number of seconds to wait for server
-                              response, must be > 0.
-    - shortResponseTimeout: float: maximum number of seconds to wait for further
-                                   response lines, if multi-line response is
-                                   expected; must be > 0.
+    - responseTimeout: float:      Maximum number of seconds to wait for server
+                                   response.  Since the server queues all
+                                   commands to execute them asynchronously in a
+                                   separate thread, the response should be very
+                                   quick, and this is just a safety measure in
+                                   case the server itself is not reachable.
+                                   Must be > 0.
+    - longResponseTimeout: float:  Maximum number of seconds to wait for server
+                                   response, only for "add playlist" command,
+                                   which is the only command not executed
+                                   asynchronously in a separate thread; hence,
+                                   this needs to be large enough to allow the
+                                   client to wait for the info extraction of
+                                   long playlists without the generation of
+                                   false error messages.
+                                   Must be > 0.
+    - shortResponseTimeout: float: Maximum number of seconds to wait for further
+                                   response lines (from the second line
+                                   onwards), if a multi-line response is
+                                   expected.
+                                   Must be > 0.
     """
 
     def __init__(self):
         self.responseTimeout = 10. # seconds
+        self.longResponseTimeout = 10 * 60. # seconds
         self.shortResponseTimeout = 2. # seconds
     #__init__
 
@@ -173,6 +190,9 @@ class ClientConfig:
         """
         if self.responseTimeout <= 0:
             raise ConfigError("client.responsetimeout must be > 0")
+        #if
+        if self.longResponseTimeout <= 0:
+            raise ConfigError("client.longResponseTimeout must be > 0")
         #if
         if self.shortResponseTimeout <= 0:
             raise ConfigError("client.shortResponseTimeout must be > 0")
@@ -186,6 +206,7 @@ class ClientConfig:
                   to write this object's contents to file
         """
         return { "responsetimeout" : self.responseTimeout,
+                 "longresponsetimeout" : self.longResponseTimeout,
                  "shortresponsetimeout" : self.shortResponseTimeout
                  }
     #configDict
@@ -196,10 +217,14 @@ class ClientConfig:
         Reads values from provided section and stores them to member variables.
         """
         self.responseTimeout = section.getfloat("responsetimeout")
+        self.longResponseTimeout = section.getfloat("longresponsetimeout")
         self.shortResponseTimeout = section.getfloat("shortresponsetimeout")
 
         if self.responseTimeout is None:
             raise ConfigError("field 'responsetimeout' not found")
+        #if
+        if self.longResponseTimeout is None:
+            raise ConfigError("field 'longresponsetimeout' not found")
         #if
         if self.shortResponseTimeout is None:
             raise ConfigError("field 'shortresponsetimeout' not found")
