@@ -133,13 +133,23 @@ class MsgLoadSession(czthreading.Message):
 #MsgLoadSession
 
 
+class MsgLoadAllSelection:
+    ALL = 0,
+    PENDING_ONLY = -1,
+    FINISHED_ONLY = 1
+#MsgLoadAllSelection
+
 class MsgLoadAll(czthreading.Message):
     """
     "Session load all/pending" commands sent by client to server.
     """
-    def __init__(self, pendingOnly: bool, responseBuffer: queue.Queue):
+    def __init__(self, selection: int, responseBuffer: queue.Queue):
+        """
+        :param selection: one of the constants defined in class
+                          MsgLoadAllSelection
+        """
         super().__init__()
-        self.pendingOnly = pendingOnly
+        self.selection = selection
         self.responseBuffer = responseBuffer
     #__init__
 #MsgLoadAll

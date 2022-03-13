@@ -430,15 +430,21 @@ class Server(czthreading.ReactiveThread):
     #processMsgDateList
 
 
-    def _loadSession(self, session: str, finishedToo: bool):
+    def _loadSession(self, session: str, selection: int):
+        """
+        :param selection: one of the constants defined in class
+                          MsgLoadAllSelection
+        """
         _logger.info("loading", session)
         if not os.path.exists(session):
             raise ServerError("ERROR: session '%s' does not exist" % session)
         #if
-        self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
-        self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
-        self._failedCodes.update(_loadFile(os.path.join(session, _FAILED_FILE)))
-        if finishedToo:
+        if selection in [ MsgLoadAllSelection.ALL, MsgLoadAllSelection.PENDING_ONLY ]:
+            self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
+            self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
+            self._failedCodes.update(_loadFile(os.path.join(session, _FAILED_FILE)))
+        #if
+        if selection in [ MsgLoadAllSelection.ALL, MsgLoadAllSelection.FINISHED_ONLY ]:
             self._finishedCodes.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
         #if
     #_loadSession
@@ -466,7 +472,7 @@ class Server(czthreading.ReactiveThread):
         try:
             for session in sessions:
                 self._loadSession(os.path.join(os.path.dirname(self._dataDir), session),
-                                  not message.pendingOnly)
+                                  message.selection)
             #for
             if message.responseBuffer is not None:
                 message.responseBuffer.put("successfully loaded all sessions")

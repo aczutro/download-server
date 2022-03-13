@@ -107,6 +107,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         self.stdout.write("\n")
         self.stdout.write("\nsla     'Session Load All': load all available sessions")
         self.stdout.write("\n")
+        self.stdout.write("\nslf     'Session Load Finished': load all available sessions,")
+        self.stdout.write("\n        but only finished codes")
+        self.stdout.write("\n")
         self.stdout.write("\nslp     'Session Load Pending': load all available sessions,")
         self.stdout.write("\n        but only unfinished codes")
         self.stdout.write("\n")
@@ -254,10 +257,24 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgLoadAll(False, responseBuffer))
+        self._server.comm(MsgLoadAll(MsgLoadAllSelection.ALL, responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_sls
+
+
+    def do_slf(self, args) -> bool:
+        """
+        Implements SESSION LOAD FINISHED command.
+        :param args: ignored
+        :return: False
+        """
+        responseBuffer = queue.Queue()
+        self._server.comm(MsgLoadAll(MsgLoadAllSelection.FINISHED_ONLY,
+                                     responseBuffer))
+        self._getResponse(responseBuffer)
+        return False # on true, prompt loop will end
+    #do_slf
 
 
     def do_slp(self, args) -> bool:
@@ -267,10 +284,11 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgLoadAll(True, responseBuffer))
+        self._server.comm(MsgLoadAll(MsgLoadAllSelection.PENDING_ONLY,
+                                     responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
-    #do_sls
+    #do_slp
 
 
     def do_q(self, args) -> bool:
