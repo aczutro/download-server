@@ -181,14 +181,17 @@ def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
     ydlOptions = { "no_color": True,
                    "listformats": True,
                    "encoding": "utf-8",
-                   #"cookiefile": cookies
+                   "cookiefile": cookies
                    }
+
     formatInfo =io.StringIO()
-    exitCode = 1
     try:
         with contextlib.redirect_stdout(formatInfo):
             with yt_dlp.YoutubeDL(ydlOptions) as ytdl:
-                exitCode = ytdl.download([ytCode])
+                if ytdl.download([ytCode]) != 0:
+                    _logger.warning("yt_dlp failed to download", ytCode)
+                    return None, "unknown yt_dlp failure"
+                #if
             #with
         #with
     except yt_dlp.utils.YoutubeDLError as e:
@@ -196,18 +199,13 @@ def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
         return None, str(e)
     #except
 
-    if exitCode != 0:
-        _logger.warning("yt_dlp failed to download", ytCode)
-        return None, "unknown yt_dlp failure"
-    #if
-
     codes = set(_filter(formatInfo.getvalue().split(sep='\n')))
 
     if len(codes):
         return codes, ""
     else:
         return None, \
-               "yt_dlp successfully extracted list info, but no codes found in it"
+               "successfully extracted list info, but list is empty"
     #else
 #getYTList
 
@@ -241,3 +239,6 @@ def mergeCookieFiles(outputFile: str, *filenames) -> None:
         pass
     #with
 #mergeCookieFiles
+
+
+### aczutro ###################################################################

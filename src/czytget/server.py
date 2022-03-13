@@ -14,7 +14,7 @@
 
 from .config import ServerConfig
 from .messages import *
-from .ytconnector import YTConnector, mergeCookieFiles, YTConfig
+from .ytconnector import YTConfig, YTConnector, mergeCookieFiles, getYTList
 from czutils.utils import czlogging, czthreading, cztext
 import datetime
 import os
@@ -261,7 +261,8 @@ class Server(czthreading.ReactiveThread):
         self._finishedCodes = set()
 
         self.addMessageProcessor("MsgAck", self.processMsgAck)
-        self.addMessageProcessor("MsgAdd", self.processMsgAdd)
+        self.addMessageProcessor("MsgAddCode", self.processMsgAddCode)
+        self.addMessageProcessor("MsgAddList", self.processMsgAddList)
         self.addMessageProcessor("MsgRetry", self.processMsgRetry)
         self.addMessageProcessor("MsgDiscard", self.processMsgDiscard)
         self.addMessageProcessor("MsgList", self.processMsgList)
@@ -309,7 +310,7 @@ class Server(czthreading.ReactiveThread):
     #processMsgAck
 
 
-    def processMsgAdd(self, message: MsgAdd):
+    def processMsgAddCode(self, message: MsgAddCode):
         """
         Processes a message of type MsgAdd, i.e. adds message.ytCode to the
         processing queue and, if message.responseBuffer is not None, puts a
@@ -335,7 +336,27 @@ class Server(czthreading.ReactiveThread):
             self.comm(MsgAllocate())
         #else
 
-    #processMsgAdd
+    #processMsgAddCode
+
+
+    def processMsgAddList(self, message: MsgAddList):
+        """
+        Processes a message of type MsgAdd, i.e. adds message.ytCode to the
+        processing queue and, if message.responseBuffer is not None, puts a
+        response string into it.
+        """
+        codes, err = getYTList(message.ytCode, self._cookies)
+
+        if codes is None:
+            _logger.error(err)
+            message.responseBuffer.put(err)
+        else:
+            for code in codes:
+                self.comm(MsgAddCode(code, message.responseBuffer))
+            #for
+        #else
+
+    #processMsgAddList
 
 
     def processMsgRetry(self, message: MsgRetry):

@@ -58,9 +58,11 @@ class ServerConfig:
     """
     Server config:
 
-    - numThreads: int: number of worker threads, must be > 0.
-    - dataDir: string: the directory where code files
-                       are read from and stored to; it must exist
+    - numThreads: int:    number of worker threads, must be > 0.
+    - dataDir: string:    the directory where code files
+                          are read from and stored to; it must exist
+    - cookies: string:    path to cookie file
+    - descriptions: bool: if True, download descriptions
     """
     def __init__(self):
         self.numThreads = 4
@@ -153,10 +155,14 @@ class ClientConfig:
 
     - responseTimeout: float: maximum number of seconds to wait for server
                               response, must be > 0.
+    - shortResponseTimeout: float: maximum number of seconds to wait for further
+                                   response lines, if multi-line response is
+                                   expected; must be > 0.
     """
 
     def __init__(self):
         self.responseTimeout = 10. # seconds
+        self.shortResponseTimeout = 2. # seconds
     #__init__
 
 
@@ -168,6 +174,9 @@ class ClientConfig:
         if self.responseTimeout <= 0:
             raise ConfigError("client.responsetimeout must be > 0")
         #if
+        if self.shortResponseTimeout <= 0:
+            raise ConfigError("client.shortResponseTimeout must be > 0")
+        #if
     #check
 
 
@@ -176,7 +185,9 @@ class ClientConfig:
         :returns: a dictionary that can be passed to configparser.ConfigParser()
                   to write this object's contents to file
         """
-        return { "responsetimeout" : self.responseTimeout }
+        return { "responsetimeout" : self.responseTimeout,
+                 "shortresponsetimeout" : self.shortResponseTimeout
+                 }
     #configDict
 
 
@@ -185,9 +196,13 @@ class ClientConfig:
         Reads values from provided section and stores them to member variables.
         """
         self.responseTimeout = section.getfloat("responsetimeout")
+        self.shortResponseTimeout = section.getfloat("shortresponsetimeout")
 
         if self.responseTimeout is None:
             raise ConfigError("field 'responsetimeout' not found")
+        #if
+        if self.shortResponseTimeout is None:
+            raise ConfigError("field 'shortresponsetimeout' not found")
         #if
     #fromConfigParser
 

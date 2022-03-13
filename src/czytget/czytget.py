@@ -15,7 +15,6 @@
 from .config import parseConfig, ConfigError, setLoggingOptions as setLoggingOptionsConfig
 from .server import Server, setLoggingOptions as setLoggingOptionsServer
 from .client import Client, setLoggingOptions as setLoggingOptionsClient
-from .ytconnector import setLoggingOptions as setLoggingOptionsYTConnector
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 
@@ -34,14 +33,6 @@ def main():
     #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
-        # codes, err = getYTList("PL08HmxJqBjBC5KMOsuIUoOn5vtv51NR9N", "")
-        #
-        # if codes is None:
-        #     logger.error(err)
-        # else:
-        #     logger.info(codes)
-        # #else
-
         serverConfig, clientConfig = parseConfig(".config/czytget")
         logger.info(serverConfig)
         logger.info(clientConfig)

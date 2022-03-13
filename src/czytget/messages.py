@@ -11,9 +11,9 @@
 ################################################################### aczutro ###
 
 """czytget messages"""
-import queue
 
 from czutils.utils import czthreading
+import queue
 
 
 class MsgTask(czthreading.Message):
@@ -49,9 +49,10 @@ class MsgAllocate(czthreading.Message):
 #MsgAllocate
 
 
-class MsgAdd(czthreading.Message):
+class MsgAddCode(czthreading.Message):
     """
     Add command sent by client to server.
+    Interprets 'ytCode' as an individual code.
     """
     def __init__(self, ytCode: str, responseBuffer: queue.Queue):
         super().__init__()
@@ -59,7 +60,21 @@ class MsgAdd(czthreading.Message):
         self.responseBuffer = responseBuffer
     #__init__
 
-#MsgAdd
+#MsgAddCode
+
+
+class MsgAddList(czthreading.Message):
+    """
+    Add command sent by client to server.
+    Interprets 'ytCode' as a playlist code.
+    """
+    def __init__(self, ytCode: str, responseBuffer: queue.Queue):
+        super().__init__()
+        self.ytCode = ytCode
+        self.responseBuffer = responseBuffer
+    #__init__
+
+#MsgAddList
 
 
 class MsgRetry(czthreading.Message):
@@ -88,7 +103,6 @@ class MsgList(czthreading.Message):
         super().__init__()
         self.responseBuffer = responseBuffer
     #__init__
-
 #MsgList
 
 
@@ -102,8 +116,7 @@ class MsgSessionList(czthreading.Message):
         super().__init__()
         self.responseBuffer = responseBuffer
     #__init__
-
-#MsgList
+#MsgSessionList
 
 
 class MsgLoadSession(czthreading.Message):
@@ -115,8 +128,7 @@ class MsgLoadSession(czthreading.Message):
         self.session = session
         self.responseBuffer = responseBuffer
     #__init__
-
-#MsgList
+#MsgLoadSession
 
 
 class MsgLoadAll(czthreading.Message):
@@ -128,5 +140,7 @@ class MsgLoadAll(czthreading.Message):
         self.pendingOnly = pendingOnly
         self.responseBuffer = responseBuffer
     #__init__
+#MsgLoadAll
 
-#MsgList
+
+### aczutro ###################################################################

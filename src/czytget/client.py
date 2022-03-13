@@ -124,8 +124,12 @@ class Client(czthreading.Thread, cmd.Cmd):
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    self._server.comm(MsgAdd(ytCode, response))
+                    self._server.comm(MsgAddCode(ytCode, response))
                     self._getResponse(response)
+                elif len(ytCode) == 34:
+                    _logger.info("adding code", ytCode)
+                    self._server.comm(MsgAddList(ytCode, response))
+                    self._getResponse(response, multiLine=True)
                 else:
                     self._error("bad YT code:", ytCode)
                 #else
@@ -284,12 +288,14 @@ class Client(czthreading.Thread, cmd.Cmd):
     #_error
 
 
-    def _getResponse(self, responseBuffer: queue.Queue) -> None:
+    def _getResponse(self, responseBuffer: queue.Queue, multiLine=False) -> None:
         """
         Waits for a message (string) to be put into 'responseBuffer' and prints
         the message to STDOUT.
         In case of timeout, prints an error message.
         """
+
+        # at least one response string must arrive
         try:
             self.stdout.write(
                 responseBuffer.get(
@@ -299,6 +305,21 @@ class Client(czthreading.Thread, cmd.Cmd):
         except queue.Empty:
             self._error("server response timeout")
         #except
+
+        # additional response strings are optional
+        if multiLine:
+            while True:
+                try:
+                    self.stdout.write(
+                        responseBuffer.get(
+                            block = True,
+                            timeout = self._config.shortResponseTimeout))
+                    self.stdout.write("\n")
+                except queue.Empty:
+                    return
+                #except
+            #while
+        #if
     #_getResponse
 
 #Client
