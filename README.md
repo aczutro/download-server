@@ -27,7 +27,8 @@ import czytget
 
 Documentation can be accessed with `help(czytget)`.
 
-Pip will also install the executable scripts `czytgetd` and `czytget`.
+Pip will also install the executable scripts `czytget`, which runs a
+czytget server and an integrated client with an own command shell.
 
 If you are not *root* when  you run the installation command, Pip will
 install the library and executables locally in your home.
@@ -54,6 +55,12 @@ pip uninstall czytget
 
 ## Changelog
 
-### Version 1.0.0: first release
+### Version 1.0: first release
 
-#### Non-breaking additions
+#### Non-breaking
+
+First complete implementation of library `czytget`, which includes
+module `server` (the server), module `client` (an integrated client
+that communicates directly with the server via direct messaging) and
+module `ytconnector` (an interface to the `yt-dlp` backend the server
+uses to perform downloads).
