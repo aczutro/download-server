@@ -15,7 +15,7 @@ A simple server to execute multiple parallel download jobs.
 """
 
 __author__ = "Alexander Czutro <github@czutro.ch>"
-__version__ = "1.0.0"
+__version__ = "1.1"
 
 from .czytget import main as czytget
 

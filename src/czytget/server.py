@@ -12,6 +12,7 @@
 
 """czytget server"""
 
+from . import __version__, __author__
 from .config import ServerConfig
 from .messages import *
 from .ytconnector import YTConfig, YTConnector, mergeCookieFiles, getYTList
@@ -276,7 +277,8 @@ class Server(czthreading.ReactiveThread):
 
 
     def threadCodePre(self):
-        print("starting czytget server")
+        print("czytget server v.%s" % __version__)
+        print(__author__)
         for worker in self._workers:
             worker.start()
         #for
