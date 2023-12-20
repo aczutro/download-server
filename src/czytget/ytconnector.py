@@ -105,7 +105,8 @@ class YTConnector:
                        "writedescription": config.descriptions,
                        "logger": _YTLogger(),
                        "logtostderr": True,
-                       "cookiefile": config.cookies }
+                       "cookiefile": config.cookies,
+                       "updatetime": False }
         self._ydl = yt_dlp.YoutubeDL(ydlOptions)
     #__init__
 

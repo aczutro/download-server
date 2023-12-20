@@ -64,3 +64,10 @@ module `server` (the server), module `client` (an integrated client
 that communicates directly with the server via direct messaging) and
 module `ytconnector` (an interface to the `yt-dlp` backend the server
 uses to perform downloads).
+
+### Version 1.1
+
+#### Non-breaking
+
+Downloaded files now timestamped with the download time instead of the source's
+upload time.
