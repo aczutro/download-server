@@ -19,9 +19,9 @@ homepage = "https://github.com/aczutro/czytget"
 license = "GPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python  = "^3.9"
+python  = "^3.10"
 czutils = "^1.4.0"
-yt-dlp  = "^2022.2.4"
+yt-dlp  = "^2023.10.13"
 
 [tool.poetry.dev-dependencies]
 
