@@ -12,7 +12,7 @@
 
 [tool.poetry]
 name = "czytget"
-version = "1.1"
+version = "1.2"
 description = "A simple server to execute multiple parallel download jobs."
 authors = ["Alexander Czutro <github@czutro.ch>"]
 homepage = "https://github.com/aczutro/czytget"
@@ -27,6 +27,7 @@ yt-dlp  = "^2023.10.13"
 
 [tool.poetry.scripts]
 czytget = "czytget:czytget"
+czytgetd = "czytget:czytgetd"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

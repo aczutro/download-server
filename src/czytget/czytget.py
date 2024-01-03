@@ -19,9 +19,8 @@ from czutils.utils import czlogging, czsystem, czthreading
 import sys
 
 
-def main():
-    """
-    Main routine of the integrated czytget server/client.
+def czytget():
+    """Entry point for czytget.
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
@@ -55,7 +54,40 @@ def main():
        #raise e
        sys.exit(2)
     #except
-#autoStr
+#czytget
+
+
+def czytgetd():
+    """Entry point for czytgetd.
+    """
+    logger = czlogging.LoggingChannel(czsystem.appName(),
+                                      czlogging.LoggingLevel.WARNING)
+    #czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
+    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
+
+    try:
+        serverConfig, clientConfig = parseConfig(".config/czytget")
+        logger.info(serverConfig)
+        logger.info(clientConfig)
+
+        server = Server(serverConfig)
+        server.start()
+        server.wait()
+
+        sys.exit(0)
+    except ConfigError as e:
+        logger.error(e)
+        sys.exit(1)
+    except Exception as e:
+        logger.error("unexpected exception:", e)
+        #raise e
+        sys.exit(2)
+    #except
+#czytgetd
 
 
 ### aczutro ###################################################################

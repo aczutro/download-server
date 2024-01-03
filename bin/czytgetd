@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+#
 # Copyright (C) 2021 - present  Alexander Czutro <github@czutro.ch>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -10,13 +12,10 @@
 #
 ################################################################### aczutro ###
 
-"""
-A simple server to execute multiple parallel download jobs.
-"""
+import czytget
 
-__author__ = "Alexander Czutro <github@czutro.ch>"
-__version__ = "1.2"
-
-from .czytget import czytget, czytgetd
+if __name__ == '__main__':
+    czytget.czytgetd()
+#if
 
 ### aczutro ###################################################################
