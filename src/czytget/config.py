@@ -54,6 +54,60 @@ class ConfigError(Exception):
 
 
 @czcode.autoStr
+class CommConfig:
+    """
+    Comm config:
+
+    - ip:   string:    host IP
+    - port: int:       port
+    """
+    def __init__(self):
+        self.ip = "127.0.0.1"
+        self.port = 4747
+    #__init__
+
+
+    def verify(self) -> None:
+        """
+        Checks if all values comply with the specs.
+        :raises: ConfigError
+        """
+        if self.port < 1024:
+            raise ConfigError("port must be > 1023")
+        #if
+    #verify
+
+
+    def configDict(self) -> dict:
+        """
+        :returns: a dictionary that can be passed to configparser.ConfigParser()
+                  to write this object's contents to file
+        """
+        return { "ip" : self.ip,
+                 "port" : self.port
+                 }
+    #configDict
+
+
+    def fromConfigParser(self, section: configparser.SectionProxy) -> None:
+        """
+        Reads values from provided section and stores them to member variables.
+        """
+        self.ip = section.get("ip")
+        self.port = section.getint("port")
+
+        if self.ip is None:
+            raise ConfigError("field 'ip' not found")
+        #if
+        if self.port is None:
+            raise ConfigError("field 'port' not found")
+        #if
+    #fromConfigParser
+
+#ServerConfig
+
+
+@czcode.autoStr
 class ServerConfig:
     """
     Server config:
@@ -106,7 +160,7 @@ class ServerConfig:
                 raise ConfigError(errorString)
             #if
         #if
-    #check
+    #verify
 
 
     def configDict(self) -> dict:
@@ -197,7 +251,7 @@ class ClientConfig:
         if self.shortResponseTimeout <= 0:
             raise ConfigError("client.shortResponseTimeout must be > 0")
         #if
-    #check
+    #verify
 
 
     def configDict(self) -> dict:
@@ -234,26 +288,29 @@ class ClientConfig:
 #ClientConfig
 
 
-def _makeDefaultConfig(configFile: str) -> typing.Tuple[ ServerConfig, ClientConfig ]:
+def _makeDefaultConfig(configFile: str) -> typing.Tuple[ CommConfig, ServerConfig, ClientConfig ]:
     """
     Creates a default configuration and writes it to file configFile.
 
     :returns: ServerConfig and ClientConfig objects that contain the data
               written to file.
     """
+    commConfig = CommConfig()
+
     serverConfig = ServerConfig()
     serverConfig.dataDir = os.path.dirname(configFile)
     serverConfig.cookies = os.path.join(serverConfig.dataDir, ".cookies")
 
     clientConfig = ClientConfig()
 
-    writeConfig(configFile, serverConfig, clientConfig)
+    writeConfig(configFile, commConfig, serverConfig, clientConfig)
 
-    return serverConfig, clientConfig
+    return commConfig, serverConfig, clientConfig
 #_makeDefaultConfig
 
 
 def writeConfig(configFile: str,
+                commConfig: CommConfig,
                 serverConfig: ServerConfig,
                 clientConfig: ClientConfig) -> None:
     """
@@ -261,6 +318,7 @@ def writeConfig(configFile: str,
     """
     configWriter = configparser.ConfigParser()
 
+    configWriter["comm"] = commConfig.configDict()
     configWriter["server"] = serverConfig.configDict()
     configWriter["client"] = clientConfig.configDict()
 
@@ -271,7 +329,7 @@ def writeConfig(configFile: str,
 #writeConfig
 
 
-def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
+def parseConfig(configDir: str) -> tuple[CommConfig, ServerConfig, ClientConfig]:
     """
     Parses file '.config' in directory configDir, and returns
     ServerConfig and ClientConfig objects that contain the parsed data.
@@ -290,11 +348,22 @@ def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
         return _makeDefaultConfig(configFile)
     #if
 
+    commConfig = None
     serverConfig = None
     clientConfig = None
 
     configReader = configparser.ConfigParser()
     configReader.read(configFile)
+
+    if "comm" in configReader.sections():
+        commConfig = CommConfig()
+        try:
+            commConfig.fromConfigParser(configReader["comm"])
+            commConfig.verify()
+        except Exception as e:
+            raise ConfigError("bad comm config: %s" % e)
+        #except
+    #if
 
     if "server" in configReader.sections():
         serverConfig = ServerConfig()
@@ -316,7 +385,7 @@ def parseConfig(configDir: str) -> tuple[ServerConfig, ClientConfig]:
         #except
     #if
 
-    return serverConfig, clientConfig
+    return commConfig, serverConfig, clientConfig
 
 #parseConfig
 

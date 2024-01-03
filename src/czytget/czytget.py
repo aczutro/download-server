@@ -32,17 +32,18 @@ def czytget():
     #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
-        serverConfig, clientConfig = parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = parseConfig(".config/czytget")
+        logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
 
         server = Server(serverConfig)
-        server.start()
+        #server.start()
 
         client = Client(clientConfig, server)
         client.start()
 
-        server.wait()
+        #server.wait()
         client.wait()
 
         sys.exit(0)
@@ -70,7 +71,8 @@ def czytgetd():
     #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
 
     try:
-        serverConfig, clientConfig = parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = parseConfig(".config/czytget")
+        logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
 
