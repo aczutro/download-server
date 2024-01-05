@@ -10,7 +10,7 @@
 #
 ################################################################### aczutro ###
 
-"""Config and command line parsing for czytget."""
+"""Config for czytget."""
 
 from czutils.utils import czcode, czlogging, czsystem
 import configparser

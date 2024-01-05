@@ -12,11 +12,10 @@
 
 """A simple server to execute multiple parallel download jobs."""
 
-from .config import parseConfig, ConfigError, setLoggingOptions as setLoggingOptionsConfig
-from .server import Server, setLoggingOptions as setLoggingOptionsServer
-from .client import Client, setLoggingOptions as setLoggingOptionsClient
+from . import comm, config, server, client, ytconnector, czcommunicator
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
+import threading
 
 
 def czytget():
@@ -24,30 +23,44 @@ def czytget():
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
-    #czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
+    # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
+
 
     try:
-        commConfig, serverConfig, clientConfig = parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
         logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
 
-        server = Server(serverConfig)
+        communicator = comm.CommClient(commConfig)
+        communicator.start()
+        try:
+            while True:
+                message = input("enter message: ")
+                communicator.send(message)
+            #while
+        except EOFError:
+            communicator.stop()
+        #except
+
+
+        #server = Server(serverConfig)
         #server.start()
 
-        client = Client(clientConfig, server)
-        client.start()
+        #client = Client(clientConfig, server)
+        #client.start()
 
         #server.wait()
-        client.wait()
+        #client.wait()
 
         sys.exit(0)
-    except ConfigError as e:
+    except config.ConfigError as e:
         logger.error(e)
         sys.exit(1)
     except Exception as e:
@@ -63,31 +76,42 @@ def czytgetd():
     """
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
-    #czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    #czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsConfig(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsClient(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsServer(czlogging.LoggingLevel.INFO)
-    #setLoggingOptionsYTConnector(czlogging.LoggingLevel.INFO)
+    # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
 
     try:
-        commConfig, serverConfig, clientConfig = parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
         logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
 
-        server = Server(serverConfig)
-        server.start()
-        server.wait()
+        try:
+            communicator = comm.CommServer(commConfig)
+        except czcommunicator.CommError as e:
+            logger.error(e)
+            sys.exit(2)
+        #except
+        communicator.start()
+        try:
+            threading.Event().wait()
+        except KeyboardInterrupt:
+            pass
+        #except
+        communicator.stop()
+
+        # server = Server(serverConfig)
+        # server.start()
+        # server.wait()
 
         sys.exit(0)
-    except ConfigError as e:
+    except config.ConfigError as e:
         logger.error(e)
         sys.exit(1)
-    except Exception as e:
-        logger.error("unexpected exception:", e)
-        #raise e
-        sys.exit(2)
     #except
 #czytgetd
 
