@@ -40,22 +40,26 @@ class Protocol(czcommunicator.Communicator, czcommunicator.Subscriber):
         commConfig.isServer = isServer
         czcommunicator.Subscriber.__init__(self)
         czcommunicator.Communicator.__init__(self, commConfig, self)
+        self._isServer = isServer
     #__init__
 
 
     def cbkReceived(self, packet: czcommunicator.Packet) -> None:
-        _logger.info("sender:", self.clientAddress(packet.sender))
+        _logger.info("sender:", self.clientName(packet.sender))
         _logger.info("data:", packet.data)
+        if self._isServer:
+            self.send(packet.data, packet.sender)
+        #if
     #_cbkReceived
 
 
     def cbkConnected(self, clientID: int) -> None:
-        _logger.info(self.clientAddress(clientID), "connected")
+        _logger.info(self.clientName(clientID), "connected")
     #_cbkConnected
 
 
     def cbkDisconnected(self, clientID: int) -> None:
-        _logger.info(self.clientAddress(clientID), "disconnected")
+        _logger.info(self.clientName(clientID), "disconnected")
     #_cbkDisconnected
 
 #Protocol

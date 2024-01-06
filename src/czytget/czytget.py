@@ -18,60 +18,6 @@ import sys
 import threading
 
 
-def czytget():
-    """Entry point for czytget.
-    """
-    logger = czlogging.LoggingChannel(czsystem.appName(),
-                                      czlogging.LoggingLevel.WARNING)
-    # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
-
-
-    try:
-        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
-        logger.info(commConfig)
-        logger.info(serverConfig)
-        logger.info(clientConfig)
-
-        connector = protocol.Protocol(commConfig, False)
-        connector.start()
-        try:
-            while True:
-                message = input("enter message: ")
-                connector.send(message)
-            #while
-        except EOFError:
-            connector.stop()
-        #except
-
-
-        #server = Server(serverConfig)
-        #server.start()
-
-        #client = Client(clientConfig, server)
-        #client.start()
-
-        #server.wait()
-        #client.wait()
-
-        sys.exit(0)
-    except config.ConfigError as e:
-        logger.error(e)
-        sys.exit(1)
-    except Exception as e:
-       logger.error("unexpected exception:", e)
-       #raise e
-       sys.exit(2)
-    #except
-#czytget
-
-
 def czytgetd():
     """Entry point for czytgetd.
     """
@@ -116,6 +62,62 @@ def czytgetd():
         sys.exit(1)
     #except
 #czytgetd
+
+
+def czytget():
+    """Entry point for czytget.
+    """
+    logger = czlogging.LoggingChannel(czsystem.appName(),
+                                      czlogging.LoggingLevel.WARNING)
+    # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
+
+
+    try:
+        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
+        logger.info(commConfig)
+        logger.info(serverConfig)
+        logger.info(clientConfig)
+
+        connector = protocol.Protocol(commConfig, False)
+        connector.start()
+        try:
+            while True:
+                message = input("enter message: ")
+                if message == "":
+                    break
+                #if
+                connector.send(message.encode())
+            #while
+        except EOFError:
+            pass
+        except KeyboardInterrupt:
+            pass
+        finally:
+            connector.stop()
+        #finally
+
+        #server = Server(serverConfig)
+        #server.start()
+
+        #client = Client(clientConfig, server)
+        #client.start()
+
+        #server.wait()
+        #client.wait()
+
+        sys.exit(0)
+    except config.ConfigError as e:
+        logger.error(e)
+        sys.exit(1)
+    #except
+#czytget
 
 
 ### aczutro ###################################################################

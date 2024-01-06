@@ -11,9 +11,9 @@
 ################################################################### aczutro ###
 
 """Socket communicator."""
-import collections
 
 from czutils.utils import czthreading, czlogging, czcode
+import collections
 import queue
 import socket
 import threading
@@ -42,38 +42,44 @@ class CommError(Exception):
 
 Packet = collections.namedtuple("Packet", "sender data")
 
+
 class Subscriber:
-    """Null subscriber (discards received data without action.
+    """Null subscriber (discards received data without action).
 
     You need one of these to instantiate a Communicator object.
-    The communicator will call _cbkReceived every time it receives data from the
-    socket.
+    Derive from this class and override the callback functions to fit your
+    needs.
+
+    The communicator will call cbkReceived every time it receives data from the
+    socket.  It will also call cbkConnected or cbkDisconnected every
+    time a client connects or disconnects, respectively.
     """
     def cbkReceived(self, packet: Packet) -> None:
-        """Called by communicator to deliver data.
-        Extend this class and override this function to fit your needs.
+        """Called by the communicator to deliver data.
 
         :param packet: a tuple composed of the sender's ID (int) and the
                        received data (bytes).
         """
         _logger.info("subscriber receives:", packet)
-    #_cbkReceived
+    #cbkReceived
 
 
     def cbkConnected(self, clientID: int) -> None:
-        """Called by server-mode communicator when a client has connected.
+        """Called by the communicator when a client has connected.
+
         :param clientID: the client's ID
         """
         _logger.info("subscriber receives: client", clientID, "connected")
-    #_cbkConnected
+    #cbkConnected
 
 
     def cbkDisconnected(self, clientID: int) -> None:
-        """Called by server-mode communicator when a client has disconnected.
+        """Called by the communicator when a client has disconnected.
+
         :param clientID: the client's ID
         """
         _logger.info("subscriber receives: client", clientID, "disconnected")
-    #_cbkDisconnected
+    #cbkDisconnected
 
 #Subscriber
 
@@ -81,16 +87,17 @@ class Subscriber:
 @czcode.autoStr
 class CommConfig:
     """
-    Comm config:
+    Configuration for the instantiation of Communicator objects
 
-    - name : string     communicator name; used to name communicator threads
-    - ip : string       socket IP
-    - port : int:       socket port
-    - packetSize : int  maximum number of bytes to request/send from/to socket
-                        in one operations
-    - timeout : float   maximum number of seconds to wait for data from socket
-    - isServer : bool   if true, create socket; if false, connect to existing
-                        socket
+    :ivar name:       (str) communicator name; used to name communicator
+                      threads
+    :ivar ip:         (str) socket IP
+    :ivar port:       (int) socket port
+    :ivar packetSize: (int) maximum number of bytes to request/send from/to
+                      socket in one operation
+    :ivar timeout:    (float) maximum number of seconds to wait for data from
+                      socket
+    :ivar isServer:   if true, run in server mode; else, run in client mode
     """
     def __init__(self):
         self.name = ""
@@ -104,12 +111,36 @@ class CommConfig:
 
 
 def _addressToString(address: tuple) -> str:
+    """
+    :param address: tuple composed of an address (str) and a port (int)
+
+    :returns: string of the form "address:port"
+    """
     return f"{address[0]}:{address[1]}"
 #_addressToString
 
 
 class Communicator(czthreading.Thread):
+    """A socket communicator.
 
+    In server mode, creates a socket, listens for connections and manages
+    connections.
+
+    In client mode, connects to an existing socket.
+
+    In both modes, sends incoming data to a subscriber using the Subscriber
+    class's callback functions.  It also sends a message every time a client
+    connects or disconnects.
+
+    Both modes offer a send function to send messages back to the clients or the
+    server.
+
+    :param conf:       the communicator's configuration
+    :param subscriber: the subscriber object that will receive data and
+                       connection updates
+
+    :raises: CommError
+    """
     def __init__(self, conf: CommConfig, subscriber: Subscriber):
         super().__init__(conf.name)
         self._config = conf
@@ -117,14 +148,13 @@ class Communicator(czthreading.Thread):
         self._connector = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._received = queue.Queue()
         self._threads = []
+        self._connections = []
+        self._lockConnections = threading.Lock()
         try:
             if self._config.isServer:
                 self._connector.bind((self._config.ip, self._config.port))
                 self._connector.listen()
-                self._connector.setblocking(False)
                 self._connector.settimeout(self._config.timeout)
-                self._connections = []
-                self._lockConnections = threading.Lock()
             else:
                 self._connector.connect((self._config.ip, self._config.port))
             #if
@@ -155,45 +185,86 @@ class Communicator(czthreading.Thread):
                     continue
                 #except
             #while
+            self._connector.close()
         else:
-            while self.running():
-                time.sleep(1)
-            #while
+            self._receive(self._connector)
         #else
 
-        self._connector.close()
         for thread in self._threads:
             thread.join()
         #for
     #threadCode
 
 
-    def clientAddress(self, clientID: int) -> str:
+    def clientName(self, clientID: int) -> str:
         """
-        :returns: the address of the client with ID clientID
+        :returns: the name (address) of the client with ID clientID
         """
-        if self._connections[clientID] is None:
-            return f"client {clientID}"
-        else:
-            return _addressToString(self._connections[clientID].getpeername())
-        #else
+        with self._lockConnections:
+            if self._connections[clientID] is None:
+                return f"client {clientID}"
+            else:
+                return _addressToString(self._connections[clientID].getpeername())
+            #else
+        #with
     #clientAddress
 
 
-    def send(self, msg: str):
+    def send(self, msg: bytes, clientID: int | None = None) -> None:
+        """Sends a message.
+
+        :param msg:      A non-empty message.
+        :param clientID: In server mode, ID of the client to send the message
+                         to, or None, in which it will be sent to all clients.
+                         Ignored in client mode.
+
+        :raises: ValueError
+        """
+        if msg == b"":
+            raise ValueError
+        #if
+
         if self.running():
-            self._connector.sendall(msg.encode())
+            if self._config.isServer:
+                with self._lockConnections:
+                    if clientID is None:
+                        for connection in self._connections:
+                            if connection is not None:
+                                connection.sendall(msg)
+                            #if
+                        #for
+                    elif clientID < 0 or clientID >= len(self._connections):
+                        raise ValueError
+                    elif self._connections[clientID] is None:
+                        _logger.warning("connection to client", clientID,
+                                        "has been closed; not sending message", msg)
+                    else:
+                        self._connections[clientID].sendall(msg)
+                    #else
+                #with
+            else:
+                if clientID is not None:
+                    _logger.warning("operating in client mode; send(...) ignoring clientID")
+                #if
+                if self._connector.fileno() == -1:
+                    _logger.warning("connection to server closed; cannot send message")
+                else:
+                    self._connector.sendall(msg)
+                #else
+            #else
+        else:
+            _logger.warning("communicator not running; not sending message", msg)
         #if
     #send
 
 
     def _receive(self, connection: socket.socket):
         connection.settimeout(self._config.timeout)
-        self._lockConnections.acquire()
-        clientID = len(self._connections)
-        self._connections.append(connection)
-        _logger.info("connections:", self._connections)
-        self._lockConnections.release()
+        with self._lockConnections:
+            clientID = len(self._connections)
+            self._connections.append(connection)
+            _logger.info("connections:", self._connections)
+        #with
         self._subscriber.cbkConnected(clientID)
 
         while self.running():
@@ -201,6 +272,8 @@ class Communicator(czthreading.Thread):
                 packet = connection.recv(self._config.packetSize)
                 _logger.info(f"received {packet}")
             except TimeoutError:
+                continue
+            except OSError:
                 continue
             #except
             if packet == b"":
@@ -210,10 +283,10 @@ class Communicator(czthreading.Thread):
         #while
 
         connection.close()
-        self._lockConnections.acquire()
-        self._connections[clientID] = None
-        _logger.info("connections:", self._connections)
-        self._lockConnections.release()
+        with self._lockConnections:
+            self._connections[clientID] = None
+            _logger.info("connections:", self._connections)
+        #with
         self._subscriber.cbkDisconnected(clientID)
     #_receive
 
