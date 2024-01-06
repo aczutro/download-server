@@ -26,17 +26,8 @@ _logger = czlogging.LoggingChannel("czutils.utils.czcommunicator",
 
 
 def setLoggingOptions(level: int, colour=True) -> None:
-    """
-    Sets this module's logging level.  If not called, the logging level is
-    SILENT.
-
-    :param level: One of the following:
-                  - czlogging.LoggingLevel.INFO
-                  - czlogging.LoggingLevel.WARNING
-                  - czlogging.LoggingLevel.ERROR
-                  - czlogging.LoggingLevel.SILENT
-
-    :param colour: If true, use colour in log headers.
+    """Sets this module's logging level and colour option.
+    If not called, the logging level is SILENT.
     """
     global _logger
     _logger = czlogging.LoggingChannel("czutils.utils.czcommunicator",
@@ -58,15 +49,32 @@ class Subscriber:
     The communicator will call _cbkReceived every time it receives data from the
     socket.
     """
-    def _cbkReceived(self, packet: Packet) -> None:
+    def cbkReceived(self, packet: Packet) -> None:
         """Called by communicator to deliver data.
         Extend this class and override this function to fit your needs.
 
-        :param packet: a tuple composed of the sender's address (str) and the
+        :param packet: a tuple composed of the sender's ID (int) and the
                        received data (bytes).
         """
         _logger.info("subscriber receives:", packet)
-    #onReceive
+    #_cbkReceived
+
+
+    def cbkConnected(self, clientID: int) -> None:
+        """Called by server-mode communicator when a client has connected.
+        :param clientID: the client's ID
+        """
+        _logger.info("subscriber receives: client", clientID, "connected")
+    #_cbkConnected
+
+
+    def cbkDisconnected(self, clientID: int) -> None:
+        """Called by server-mode communicator when a client has disconnected.
+        :param clientID: the client's ID
+        """
+        _logger.info("subscriber receives: client", clientID, "disconnected")
+    #_cbkDisconnected
+
 #Subscriber
 
 
@@ -115,7 +123,8 @@ class Communicator(czthreading.Thread):
                 self._connector.listen()
                 self._connector.setblocking(False)
                 self._connector.settimeout(self._config.timeout)
-                self._connections = {}
+                self._connections = []
+                self._lockConnections = threading.Lock()
             else:
                 self._connector.connect((self._config.ip, self._config.port))
             #if
@@ -139,7 +148,7 @@ class Communicator(czthreading.Thread):
                         threading.Thread(target=self._receive,
                                          name=f"{self._config.name}:{_addressToString(address)}",
                                          daemon=True,
-                                         args=(connection, _addressToString(address))
+                                         args=(connection,)
                                          ))
                     self._threads[-1].start()
                 except TimeoutError:
@@ -159,6 +168,18 @@ class Communicator(czthreading.Thread):
     #threadCode
 
 
+    def clientAddress(self, clientID: int) -> str:
+        """
+        :returns: the address of the client with ID clientID
+        """
+        if self._connections[clientID] is None:
+            return f"client {clientID}"
+        else:
+            return _addressToString(self._connections[clientID].getpeername())
+        #else
+    #clientAddress
+
+
     def send(self, msg: str):
         if self.running():
             self._connector.sendall(msg.encode())
@@ -166,10 +187,14 @@ class Communicator(czthreading.Thread):
     #send
 
 
-    def _receive(self, connection: socket.socket, address: str):
+    def _receive(self, connection: socket.socket):
         connection.settimeout(self._config.timeout)
-        self._connections[address] = connection
-        _logger.info("connections:", list(self._connections))
+        self._lockConnections.acquire()
+        clientID = len(self._connections)
+        self._connections.append(connection)
+        _logger.info("connections:", self._connections)
+        self._lockConnections.release()
+        self._subscriber.cbkConnected(clientID)
 
         while self.running():
             try:
@@ -181,14 +206,15 @@ class Communicator(czthreading.Thread):
             if packet == b"":
                 break
             #if
-            self._received.put(Packet(address, packet), block = True, timeout = None)
+            self._received.put(Packet(clientID, packet), block = True, timeout = None)
         #while
 
-        _logger.warning(f"disconnected from {address}")
         connection.close()
-
-        self._connections.pop(address)
-        _logger.info("connections:", list(self._connections))
+        self._lockConnections.acquire()
+        self._connections[clientID] = None
+        _logger.info("connections:", self._connections)
+        self._lockConnections.release()
+        self._subscriber.cbkDisconnected(clientID)
     #_receive
 
 
@@ -197,7 +223,7 @@ class Communicator(czthreading.Thread):
             try:
                 packet = self._received.get(block=True, timeout=self._config.timeout)
                 _logger.info("dispatching", packet)
-                self._subscriber._cbkReceived(packet)
+                self._subscriber.cbkReceived(packet)
             except queue.Empty:
                 pass
             #except

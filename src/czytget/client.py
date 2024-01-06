@@ -23,22 +23,13 @@ _logger = czlogging.LoggingChannel("czytget.client",
                                    czlogging.LoggingLevel.SILENT,
                                    colour=True)
 
+
 def setLoggingOptions(level: int, colour=True) -> None:
-    """
-    Sets this module's logging level.  If not called, the logging level is
-    SILENT.
-
-    :param level: One of the following:
-                  - czlogging.LoggingLevel.INFO
-                  - czlogging.LoggingLevel.WARNING
-                  - czlogging.LoggingLevel.ERROR
-                  - czlogging.LoggingLevel.SILENT
-
-    :param colour: If true, use colour in log headers.
+    """Sets this module's logging level and colour option.
+    If not called, the logging level is SILENT.
     """
     global _logger
     _logger = czlogging.LoggingChannel("czytget.client", level, colour=colour)
-
 #setLoggingOptions
 
 

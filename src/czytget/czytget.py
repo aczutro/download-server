@@ -12,7 +12,7 @@
 
 """A simple server to execute multiple parallel download jobs."""
 
-from . import comm, config, server, client, ytconnector, czcommunicator
+from . import protocol, config, server, client, ytconnector, czcommunicator
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 import threading
@@ -27,6 +27,7 @@ def czytget():
     # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
     czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
@@ -38,15 +39,15 @@ def czytget():
         logger.info(serverConfig)
         logger.info(clientConfig)
 
-        communicator = comm.CommClient(commConfig)
-        communicator.start()
+        connector = protocol.Protocol(commConfig, False)
+        connector.start()
         try:
             while True:
                 message = input("enter message: ")
-                communicator.send(message)
+                connector.send(message)
             #while
         except EOFError:
-            communicator.stop()
+            connector.stop()
         #except
 
 
@@ -80,6 +81,7 @@ def czytgetd():
     # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
     czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
@@ -91,18 +93,18 @@ def czytgetd():
         logger.info(clientConfig)
 
         try:
-            communicator = comm.CommServer(commConfig)
+            connector = protocol.Protocol(commConfig, True)
         except czcommunicator.CommError as e:
             logger.error(e)
             sys.exit(2)
         #except
-        communicator.start()
+        connector.start()
         try:
             threading.Event().wait()
         except KeyboardInterrupt:
             pass
         #except
-        communicator.stop()
+        connector.stop()
 
         # server = Server(serverConfig)
         # server.start()
