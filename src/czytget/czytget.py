@@ -11,8 +11,9 @@
 ################################################################### aczutro ###
 
 """A simple server to execute multiple parallel download jobs."""
+from mailbox import mboxMessage
 
-from . import protocol, config, server, client, ytconnector, czcommunicator
+from . import protocol, config, server, client, ytconnector, czcommunicator, messages
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 import threading
@@ -93,7 +94,17 @@ def czytget():
                 if message == "":
                     break
                 #if
-                connector.send(message.encode())
+                if message == "1":
+                    connector.send(messages.MsgRetry())
+                elif message == "2":
+                    connector.send(messages.MsgDiscard())
+                elif message == "3":
+                    connector.send({1: "one", 2: "two", 3: "three"})
+                elif message == "4":
+                    connector.send("new\x0aline")
+                else:
+                    connector.send(message)
+                #else
             #while
         except EOFError:
             pass

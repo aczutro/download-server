@@ -14,10 +14,10 @@
 
 from czutils.utils import czthreading, czlogging, czcode
 import collections
+import pickle
 import queue
 import socket
 import threading
-import time
 
 
 _logger = czlogging.LoggingChannel("czutils.utils.czcommunicator",
@@ -304,6 +304,85 @@ class Communicator(czthreading.Thread):
     #_dispatch
 
 #Communicator
+
+
+class SerialiserError(Exception):
+    pass
+#SerialiserError
+
+
+class Serialiser():
+    """TODO
+    """
+
+    _START = b"$@#cz>"
+    _END = b"<#@$\r\n"
+    _lenSTART = len(_START)
+    _lenEND = len(_END)
+
+    def __init__(self):
+        self._buffers = {}
+    #__init__
+
+
+    def encode(self, obj) -> bytes:
+        return self._START + self._pickle(obj) + self._END
+    #encode
+
+
+    def decode(self, data: bytes):
+        if not data.startswith(self._START):
+            raise SerialiserError("bad start sequence")
+        elif not data.endswith(self._END):
+            raise SerialiserError("bad start sequence")
+        else:
+            return self._unpickle(data[self._lenSTART:-self._lenEND])
+        #else
+    #decode
+
+
+    def addAndDecode(self, data: bytes, ID: int):
+        try:
+            self._buffers[ID] += data
+        except KeyError:
+            self._buffers[ID] = data
+        #except
+
+        start = self._buffers[ID].find(self._START)
+        if start == -1:
+            return None
+        else:
+            self._buffers[ID] = self._buffers[ID][start:]
+        #else
+        end = self._buffers[ID].find(self._END)
+        if end == -1:
+            return None
+        else:
+            data = self._buffers[ID][self._lenSTART:end]
+            self._buffers[ID] = self._buffers[ID][end + self._lenEND:]
+            return self._unpickle(data)
+        #else
+    #addAndDecode
+
+
+    def _pickle(self, obj) -> bytes:
+        try:
+            return pickle.dumps(obj, protocol=5)
+        except pickle.PickleError as e:
+            raise SerialiserError(e)
+        #except
+    #_pickle
+
+
+    def _unpickle(self, data: bytes):
+        try:
+            return pickle.loads(data)
+        except pickle.PickleError as e:
+            raise SerialiserError(e)
+        #except
+    #def _unpickle
+
+#Serialiser
 
 
 ### aczutro ###################################################################
