@@ -311,7 +311,7 @@ class SerialiserError(Exception):
 #SerialiserError
 
 
-class Serialiser():
+class Serialiser:
     """TODO
     """
 

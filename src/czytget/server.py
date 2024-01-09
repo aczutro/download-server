@@ -13,9 +13,8 @@
 """czytget server"""
 
 from . import __version__, __author__
-from .config import ServerConfig
-from .messages import *
-from .ytconnector import YTConfig, YTConnector, mergeCookieFiles, getYTList
+from . import config, ytconnector, protocol, czcommunicator, msg
+from .msg import server, client
 from czutils.utils import czlogging, czthreading, cztext
 import datetime
 import os
@@ -38,13 +37,7 @@ def setLoggingOptions(level: int, colour=True) -> None:
 
 
 class ServerError(Exception):
-    """
-    Exception class thrown by Server
-    """
-    def __init__(self, what: str):
-        super().__init__(what)
-    #__init__
-
+    pass
 #ServerError
 
 
@@ -53,13 +46,13 @@ class Worker(czthreading.ReactiveThread):
     A worker thread that processes a YT code on demand.
     """
 
-    def __init__(self, threadName: str, ytConfig: YTConfig, server):
+    def __init__(self, threadName: str, ytConfig: ytconnector.YTConfig, server):
         super().__init__(threadName, 1)
         self._server = server
         self._free = True
         self.addMessageProcessor("MsgTask", self.processMsgTask)
         self._cookies = ytConfig.cookies
-        self._ytdl = YTConnector(ytConfig)
+        self._ytdl = ytconnector.YTConnector(ytConfig)
     #__init__
 
 
@@ -84,7 +77,7 @@ class Worker(czthreading.ReactiveThread):
     #free
 
 
-    def processMsgTask(self, message: MsgTask):
+    def processMsgTask(self, message: msg.server.MsgTask):
         """
         Processes the YT code contained in 'message' and sends a MsgAck message
         back to the server when the processing is finished.
@@ -92,7 +85,7 @@ class Worker(czthreading.ReactiveThread):
         self._free = False
         ytCode = message.ytCode
         success = self._processCode(ytCode)
-        self._server.comm(MsgAck(ytCode, success))
+        self._server.comm(msg.server.MsgAck(ytCode, success))
         self._free = True
     #processMsgTask
 
@@ -177,7 +170,7 @@ def _loadFile(filename: str) -> set:
 
 
 def _makeYTConfig(srcCookieFile: str, dstCookieFile:str, descriptions: bool) \
-        -> YTConfig:
+        -> ytconnector.YTConfig:
     """
     Copies file 'src' to 'dst' if 'src' exists.
     Then adds 'dst' to the returned YT config, even if 'src' does not exist.
@@ -187,7 +180,7 @@ def _makeYTConfig(srcCookieFile: str, dstCookieFile:str, descriptions: bool) \
     if os.path.exists(srcCookieFile):
         shutil.copyfile(srcCookieFile, dstCookieFile)
     #if
-    ans = YTConfig()
+    ans = ytconnector.YTConfig()
     ans.cookies = dstCookieFile
     ans.descriptions = descriptions
     return ans
@@ -215,14 +208,14 @@ class Server(czthreading.ReactiveThread):
     buffer.
     """
 
-    def __init__(self, config: ServerConfig):
+    def __init__(self, conf: config.ServerConfig, commConfig: config.CommConfig):
         """
         :raises: ServerError
         """
-        super().__init__('czytget-server', 1)
+        super().__init__('czytget.server', 1)
 
         self._dataDir \
-            = os.path.join(config.dataDir,
+            = os.path.join(conf.dataDir,
                            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         try:
             os.makedirs(self._dataDir)
@@ -234,15 +227,15 @@ class Server(czthreading.ReactiveThread):
             raise ServerError(errorString)
         #except
 
-        self._cookies = config.cookies
+        self._cookies = conf.cookies
 
         self._workers = [
-            Worker("worker-%d" % i,
+            Worker("worker.%d" % i,
                    _makeYTConfig(self._cookies,
                                  "%s-%d" % (self._cookies, i),
-                                 config.descriptions),
+                                 conf.descriptions),
                    self)
-            for i in range(config.numThreads) ]
+            for i in range(conf.numThreads) ]
 
         self._failedFile = os.path.join(self._dataDir, _FAILED_FILE)
         self._finishedFile = os.path.join(self._dataDir, _FINISHED_FILE)
@@ -253,6 +246,13 @@ class Server(czthreading.ReactiveThread):
         self._queuedCodes = set()
         self._processingCodes = set()
         self._finishedCodes = set()
+
+        try:
+            self._connector = protocol.Protocol(commConfig, True, self)
+        except czcommunicator.CommError as e:
+            _logger.error(e)
+            raise ServerError(f"communication error: {e}")
+        #except
 
         self.addMessageProcessor("MsgAck", self.processMsgAck)
         self.addMessageProcessor("MsgAddCode", self.processMsgAddCode)
@@ -273,24 +273,27 @@ class Server(czthreading.ReactiveThread):
         for worker in self._workers:
             worker.start()
         #for
+        self._connector.start()
     #threadCodePre
 
 
     def threadCodePost(self):
         print("stopping czytget server")
+        self._connector.stop()
+        self._connector.wait()
         cookieFiles = []
         for worker in self._workers:
             cookieFiles.append(worker.cookieFile())
             worker.stop()
         #for
-        mergeCookieFiles(self._cookies, *cookieFiles)
+        ytconnector.mergeCookieFiles(self._cookies, *cookieFiles)
         for f in cookieFiles:
             os.remove(f)
         #for
     #threadCodePost
 
 
-    def processMsgAck(self, message: MsgAck):
+    def processMsgAck(self, message: msg.server.MsgAck):
         _logger.info("received", message)
         ytCode = message.ytCode
         success = message.success
@@ -301,11 +304,11 @@ class Server(czthreading.ReactiveThread):
             self._failedCodes.add(ytCode)
         #if
         self._dumpAll()
-        self.comm(MsgAllocate())
+        self.comm(msg.server.MsgAllocate())
     #processMsgAck
 
 
-    def processMsgAddCode(self, message: MsgAddCode):
+    def processMsgAddCode(self, message: msg.client.MsgAddCode):
         """
         Processes a message of type MsgAdd, i.e. adds message.ytCode to the
         processing queue and, if message.responseBuffer is not None, puts a
@@ -328,33 +331,33 @@ class Server(czthreading.ReactiveThread):
             #if
             self._queuedCodes.add(ytCode)
             self._dumpQueued()
-            self.comm(MsgAllocate())
+            self.comm(msg.server.MsgAllocate())
         #else
 
     #processMsgAddCode
 
 
-    def processMsgAddList(self, message: MsgAddList):
+    def processMsgAddList(self, message: msg.client.MsgAddList):
         """
         Processes a message of type MsgAdd, i.e. adds message.ytCode to the
         processing queue and, if message.responseBuffer is not None, puts a
         response string into it.
         """
-        codes, err = getYTList(message.ytCode, self._cookies)
+        codes, err = ytconnector.getYTList(message.ytCode, self._cookies)
 
         if codes is None:
             _logger.error(err)
             message.responseBuffer.put(err)
         else:
             for code in codes:
-                self.comm(MsgAddCode(code, message.responseBuffer))
+                self.comm(msg.client.MsgAddCode(code, message.responseBuffer))
             #for
         #else
 
     #processMsgAddList
 
 
-    def processMsgRetry(self, message: MsgRetry):
+    def processMsgRetry(self, message: msg.client.MsgRetry):
         """
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
@@ -363,11 +366,11 @@ class Server(czthreading.ReactiveThread):
         self._failedCodes.clear()
         self._dumpQueued()
         self._dumpFailed()
-        self.comm(MsgAllocate())
+        self.comm(msg.server.MsgAllocate())
     #processMsgRetry
 
 
-    def processMsgDiscard(self, message: MsgDiscard):
+    def processMsgDiscard(self, message: msg.client.MsgDiscard):
         """
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
@@ -377,7 +380,7 @@ class Server(czthreading.ReactiveThread):
     #processMsgDiscard
 
 
-    def processMsgList(self, message: MsgList):
+    def processMsgList(self, message: msg.client.MsgList):
         """
         Processes a message of type MsgList, creates a string listing the
         contents of the internal code queue and puts the result into
@@ -400,7 +403,7 @@ class Server(czthreading.ReactiveThread):
     #processMsgList
 
 
-    def processMsgAllocate(self, message: MsgAllocate):
+    def processMsgAllocate(self, message: msg.server.MsgAllocate):
         for worker in self._workers:
             if worker.free():
                 try:
@@ -408,7 +411,7 @@ class Server(czthreading.ReactiveThread):
                     self._processingCodes.add(ytCode)
                     self._dumpQueued()
                     self._dumpProcessing()
-                    worker.comm(MsgTask(ytCode))
+                    worker.comm(msg.server.MsgTask(ytCode))
                 except KeyError:
                     pass
                 #except
@@ -417,7 +420,7 @@ class Server(czthreading.ReactiveThread):
     #processMsgAllocate
 
 
-    def processMsgSessionList(self, message: MsgSessionList):
+    def processMsgSessionList(self, message: msg.client.MsgSessionList):
         message.responseBuffer.put(
             '\n'.join(_getSubdirs(os.path.dirname(self._dataDir))))
     #processMsgDateList
@@ -432,18 +435,20 @@ class Server(czthreading.ReactiveThread):
         if not os.path.exists(session):
             raise ServerError("ERROR: session '%s' does not exist" % session)
         #if
-        if selection in [ MsgLoadAllSelection.ALL, MsgLoadAllSelection.PENDING_ONLY ]:
+        if selection in [ msg.client.LoadAllSelection.ALL,
+                          msg.client.LoadAllSelection.PENDING_ONLY ]:
             self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
             self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
             self._failedCodes.update(_loadFile(os.path.join(session, _FAILED_FILE)))
         #if
-        if selection in [ MsgLoadAllSelection.ALL, MsgLoadAllSelection.FINISHED_ONLY ]:
+        if selection in [ msg.client.LoadAllSelection.ALL,
+                          msg.client.LoadAllSelection.FINISHED_ONLY ]:
             self._finishedCodes.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
         #if
     #_loadSession
 
 
-    def processMsgLoadSession(self, message: MsgLoadSession):
+    def processMsgLoadSession(self, message: msg.client.MsgLoadSession):
         dataDir = os.path.join(os.path.dirname(self._dataDir), message.session)
         try:
             self._loadSession(dataDir, True)
@@ -456,11 +461,11 @@ class Server(czthreading.ReactiveThread):
                 message.responseBuffer.put(str(e))
             #if
         #except
-        self.comm(MsgAllocate())
+        self.comm(msg.server.MsgAllocate())
     #processMsgLoadSession
 
 
-    def processMsgLoadAll(self, message: MsgLoadAll):
+    def processMsgLoadAll(self, message: msg.client.MsgLoadAll):
         sessions = _getSubdirs(os.path.dirname(self._dataDir))
         try:
             for session in sessions:
@@ -475,7 +480,7 @@ class Server(czthreading.ReactiveThread):
                 message.responseBuffer.put(str(e))
             #if
         #except
-        self.comm(MsgAllocate())
+        self.comm(msg.server.MsgAllocate())
     #processMsgLoadAll
 
 

@@ -11,9 +11,8 @@
 ################################################################### aczutro ###
 
 """A simple server to execute multiple parallel download jobs."""
-from mailbox import mboxMessage
 
-from . import protocol, config, server, client, ytconnector, czcommunicator, messages
+from . import protocol, config, server, client, ytconnector, czcommunicator
 from czutils.utils import czlogging, czsystem, czthreading
 import sys
 import threading
@@ -25,43 +24,41 @@ def czytgetd():
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
     # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
     protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    server.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
 
     try:
-        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget2")
         logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
-
-        try:
-            connector = protocol.Protocol(commConfig, True)
-        except czcommunicator.CommError as e:
-            logger.error(e)
-            sys.exit(2)
-        #except
-        connector.start()
-        try:
-            threading.Event().wait()
-        except KeyboardInterrupt:
-            pass
-        #except
-        connector.stop()
-
-        # server = Server(serverConfig)
-        # server.start()
-        # server.wait()
-
-        sys.exit(0)
     except config.ConfigError as e:
         logger.error(e)
         sys.exit(1)
     #except
+
+    try:
+        theServer = server.Server(serverConfig, commConfig)
+    except server.ServerError as e:
+        logger.error(e)
+        sys.exit(1)
+    #except
+
+    theServer.start()
+    try:
+        threading.Event().wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        theServer.stop()
+    #except
+
+    sys.exit(0)
 #czytgetd
 
 
@@ -71,57 +68,30 @@ def czytget():
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
     # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
     protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
 
 
     try:
-        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget")
+        commConfig, serverConfig, clientConfig = config.parseConfig(".config/czytget2")
         logger.info(commConfig)
         logger.info(serverConfig)
         logger.info(clientConfig)
 
-        connector = protocol.Protocol(commConfig, False)
-        connector.start()
         try:
-            while True:
-                message = input("enter message: ")
-                if message == "":
-                    break
-                #if
-                if message == "1":
-                    connector.send(messages.MsgRetry())
-                elif message == "2":
-                    connector.send(messages.MsgDiscard())
-                elif message == "3":
-                    connector.send({1: "one", 2: "two", 3: "three"})
-                elif message == "4":
-                    connector.send("new\x0aline")
-                else:
-                    connector.send(message)
-                #else
-            #while
-        except EOFError:
-            pass
-        except KeyboardInterrupt:
-            pass
-        finally:
-            connector.stop()
-        #finally
+            theClient = client.Client(clientConfig, commConfig)
+        except client.ClientError as e:
+            logger.error(e)
+            sys.exit(1)
+        #except
 
-        #server = Server(serverConfig)
-        #server.start()
-
-        #client = Client(clientConfig, server)
-        #client.start()
-
-        #server.wait()
-        #client.wait()
+        theClient.start()
+        theClient.wait()
 
         sys.exit(0)
     except config.ConfigError as e:

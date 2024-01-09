@@ -11,44 +11,11 @@
 ################################################################### aczutro ###
 
 """
-Messages sent between server and client, and server and its worker threads.
+Messages sent by client.
 """
 
 from czutils.utils import czthreading
 import queue
-
-
-class MsgTask(czthreading.Message):
-    """
-    Task sent by server to worker thread.
-    """
-    def __init__(self, ytCode: str):
-        super().__init__()
-        self.ytCode = ytCode
-    #__init__
-
-#MsgTask
-
-
-class MsgAck(czthreading.Message):
-    """
-    Acknowledgement sent by worker thread to server.
-    """
-    def __init__(self, ytCode: str, success: bool):
-        super().__init__()
-        self.ytCode = ytCode
-        self.success = success
-    #__init__
-
-#MsgAck
-
-
-class MsgAllocate(czthreading.Message):
-    """
-    Sent by server to self to allocate a task to a free thread.
-    """
-    pass
-#MsgAllocate
 
 
 class MsgAddCode(czthreading.Message):
@@ -133,11 +100,12 @@ class MsgLoadSession(czthreading.Message):
 #MsgLoadSession
 
 
-class MsgLoadAllSelection:
+class LoadAllSelection:
     ALL = 0,
     PENDING_ONLY = -1,
     FINISHED_ONLY = 1
-#MsgLoadAllSelection
+#LoadAllSelection
+
 
 class MsgLoadAll(czthreading.Message):
     """
@@ -146,7 +114,7 @@ class MsgLoadAll(czthreading.Message):
     def __init__(self, selection: int, responseBuffer: queue.Queue):
         """
         :param selection: one of the constants defined in class
-                          MsgLoadAllSelection
+                          LoadAllSelection
         """
         super().__init__()
         self.selection = selection

@@ -12,11 +12,12 @@
 
 """czytget client"""
 
-from .config import ClientConfig
-from .messages import *
-from .server import Server
+from . import __version__, __author__
+from . import config, msg, protocol, czcommunicator
+from .msg import client
 from czutils.utils import czlogging, czthreading
 import cmd
+import queue
 
 
 _logger = czlogging.LoggingChannel("czytget.client",
@@ -33,6 +34,11 @@ def setLoggingOptions(level: int, colour=True) -> None:
 #setLoggingOptions
 
 
+class ClientError(Exception):
+    pass
+#ClientError
+
+
 class Client(czthreading.Thread, cmd.Cmd):
     """
     An "integrated" czytget client that talks directly with the server via
@@ -42,21 +48,24 @@ class Client(czthreading.Thread, cmd.Cmd):
     Offers a basic shell (command prompt loop).
     """
 
-    def __init__(self, config: ClientConfig, server: Server):
-        super().__init__("czytget-client")
-        self._config = config
-        self._server = server
-
+    def __init__(self, conf: config.ClientConfig, commConfig: config.CommConfig):
+        super().__init__("czytget.client")
+        self._config = conf
+        try:
+            self._connector = protocol.Protocol(commConfig, False, self)
+        except czcommunicator.CommError as e:
+            _logger.error(e)
+            raise ClientError(f"communication error: {e}")
+        #except
     #__init__
 
 
     def threadCode(self):
         self.prompt = "\nczytget> "
-        self.intro = "\nIntegrated czytget client"\
-                     "\n=========================\n" \
+        self.intro = f"czytget client v.{__version__}" \
+                     f"\n{__author__}\n" \
                      "\nType 'help' or '?' to list commands."
         self.cmdloop()
-
     #threadCode
 
 
@@ -104,7 +113,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         self.stdout.write("\nslp     'Session Load Pending': load all available sessions,")
         self.stdout.write("\n        but only unfinished codes")
         self.stdout.write("\n")
-        self.stdout.write("\nq       terminate the server and the client")
+        self.stdout.write("\nq       terminate the client")
         self.stdout.write("\n")
         return False # on true, prompt loop will end
 
@@ -125,11 +134,11 @@ class Client(czthreading.Thread, cmd.Cmd):
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    self._server.comm(MsgAddCode(ytCode, response))
+                    self._connector.send(msg.client.MsgAddCode(ytCode, response))
                     self._getResponse(response)
                 elif len(ytCode) == 34:
                     _logger.info("adding code", ytCode)
-                    self._server.comm(MsgAddList(ytCode, response))
+                    self._connector.send(msg.client.MsgAddList(ytCode, response))
                     self._getResponse(response, multiLine=True)
                 else:
                     self._error("bad YT code:", ytCode)
@@ -178,7 +187,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
-        self._server.comm(MsgRetry())
+        self._connector.send(msg.client.MsgRetry())
         return False # on true, prompt loop will end
     #do_r
 
@@ -189,7 +198,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
-        self._server.comm(MsgDiscard())
+        self._connector.send(msg.client.MsgDiscard())
         return False # on true, prompt loop will end
     #do_d
 
@@ -201,7 +210,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgList(responseBuffer))
+        self._connector.send(msg.client.MsgList(responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_l
@@ -214,7 +223,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgSessionList(responseBuffer))
+        self._connector.send(msg.client.MsgSessionList(responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_sls
@@ -233,7 +242,7 @@ class Client(czthreading.Thread, cmd.Cmd):
             response = queue.Queue(maxsize=1)
             for session in sessions:
                 _logger.info("loading session", session)
-                self._server.comm(MsgLoadSession(session, response))
+                self._connector.send(msg.client.MsgLoadSession(session, response))
                 self._getResponse(response)
             #for
         #else
@@ -248,7 +257,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgLoadAll(MsgLoadAllSelection.ALL, responseBuffer))
+        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.ALL,
+                                                   responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_sls
@@ -261,8 +271,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgLoadAll(MsgLoadAllSelection.FINISHED_ONLY,
-                                     responseBuffer))
+        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.FINISHED_ONLY,
+                                                   responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_slf
@@ -275,8 +285,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: False
         """
         responseBuffer = queue.Queue()
-        self._server.comm(MsgLoadAll(MsgLoadAllSelection.PENDING_ONLY,
-                                     responseBuffer))
+        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.PENDING_ONLY,
+                                                   responseBuffer))
         self._getResponse(responseBuffer)
         return False # on true, prompt loop will end
     #do_slp
@@ -289,7 +299,7 @@ class Client(czthreading.Thread, cmd.Cmd):
         :return: True
         """
         _logger.info("terminating server")
-        self._server.comm(czthreading.QuitMessage())
+        self._connector.send(czthreading.QuitMessage())
         return True # on true, prompt loop will end
     #do_q
 

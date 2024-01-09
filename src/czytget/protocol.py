@@ -11,9 +11,9 @@
 ################################################################### aczutro ###
 
 """Communicator for czytgetd and czytget"""
-import pickle
 
-from . import config, czcommunicator
+from . import config, czcommunicator, msg
+from .msg import protocol
 from czutils.utils import czthreading, czlogging
 import queue
 
@@ -34,8 +34,11 @@ def setLoggingOptions(level: int, colour=True) -> None:
 
 class Protocol(czthreading.Thread, czcommunicator.Subscriber):
 
-    def __init__(self, conf: config.CommConfig, isServer: bool):
-        name = "czytgetServer" if isServer else "czytgetClient"
+    def __init__(self,
+                 conf: config.CommConfig,
+                 isServer: bool,
+                 subscriber: czthreading.ReactiveThread):
+        name = "czytget.server" if isServer else "czytget.client"
         commConfig = czcommunicator.CommConfig()
         commConfig.name = f"{name}.comm"
         commConfig.ip = conf.ip
@@ -45,6 +48,7 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
         czcommunicator.Subscriber.__init__(self)
         self._communicator = czcommunicator.Communicator(commConfig, self)
         self._serialiser = czcommunicator.Serialiser()
+        self._subscriber = subscriber
         self._received = queue.Queue()
         self._timeout = 2.0
     #__init__
@@ -59,11 +63,15 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
 
     def cbkConnected(self, clientID: int) -> None:
         _logger.info(self._communicator.clientName(clientID), "connected")
+        if self._subscriber:
+            self._subscriber.comm(msg.protocol.MsgConnected(clientID))
     #_cbkConnected
 
 
     def cbkDisconnected(self, clientID: int) -> None:
         _logger.info(self._communicator.clientName(clientID), "disconnected")
+        if self._subscriber:
+            self._subscriber.comm(msg.protocol.MsgDisconnected(clientID))
     #_cbkDisconnected
 
 
@@ -84,8 +92,16 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
             try:
                 packet = self._received.get(block=True, timeout=self._timeout)
                 decoded = self._serialiser.addAndDecode(packet.data, packet.sender)
-                if decoded is not None:
-                    _logger.info(f"sending '{decoded}' to subscriber")
+                if decoded is None:
+                    _logger.warning(f"{decoded} is not a valid message; discarding")
+                else:
+                    if issubclass(type(decoded), czthreading.Message):
+                        _logger.info(f"sending '{decoded}' to subscriber")
+                        if self._subscriber:
+                            self._subscriber.comm(decoded)
+                    else:
+                        _logger.warning(f"{decoded} is not a valid message; discarding")
+                    #else
                 #if
             except queue.Empty:
                 pass
@@ -94,8 +110,8 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
     #threadCode
 
 
-    def send(self, msg: czthreading.Message, clientID: int | None = None) -> None:
-        self._communicator.send(self._serialiser.encode(msg), clientID)
+    def send(self, message: czthreading.Message, clientID: int | None = None) -> None:
+        self._communicator.send(self._serialiser.encode(message), clientID)
     #send
 
 #Protocol
