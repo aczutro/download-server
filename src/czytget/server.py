@@ -199,33 +199,47 @@ def _printQueue(q: set, label: str) -> str:
 #_printQueue
 
 
+def autoRepr(cls):
+    """
+    Decorator: auto-generates __repr__ method for the given class.
+    """
+    cls.__repr__ = lambda self : \
+        "%s { %s }" \
+        % (type(self).__name__,
+           ", ".join("%s=%s" % dictEntry for dictEntry in vars(self).items()))
+    return cls
+#autoStr
+
+
+@autoRepr
+class ClientData:
+    def __init__(self):
+        self.connected = True
+    #__init__
+#ClientData
+
+
 class Server(czthreading.ReactiveThread):
     """
     Implements a loop that takes commands from a client via message passing.
 
-    Some commands expect a server response.  If the command message provides
-    a response buffer (queue.Queue), the server puts the response into that
-    buffer.
-    """
+    Some commands expect a server response.  In that case, the server sends a
+    MsgResponse message to the client.
 
+    :param conf:       server configuration
+    :param commConfig: configuration for the serial communicator
+
+    :raises: ServerError
+    """
     def __init__(self, conf: config.ServerConfig, commConfig: config.CommConfig):
-        """
-        :raises: ServerError
-        """
         super().__init__('czytget.server', 1)
 
         self._dataDir \
             = os.path.join(conf.dataDir,
                            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-        try:
-            os.makedirs(self._dataDir)
-            _logger.info("Server: writing data to", self._dataDir)
-        except OSError as e:
-            errorString = "Server: cannot create data dir '%s': %s"\
-                          % (self._dataDir, e)
-            _logger.error(errorString)
-            raise ServerError(errorString)
-        #except
+        self._makeDataDir()
+
+        self._clients = {} # maps client IDs to client Data
 
         self._cookies = conf.cookies
 
@@ -254,6 +268,8 @@ class Server(czthreading.ReactiveThread):
             raise ServerError(f"communication error: {e}")
         #except
 
+        self.addMessageProcessor("MsgConnected", self.processMsgConnected)
+        self.addMessageProcessor("MsgDisconnected", self.processMsgDisconnected)
         self.addMessageProcessor("MsgAck", self.processMsgAck)
         self.addMessageProcessor("MsgAddCode", self.processMsgAddCode)
         self.addMessageProcessor("MsgAddList", self.processMsgAddList)
@@ -291,6 +307,34 @@ class Server(czthreading.ReactiveThread):
             os.remove(f)
         #for
     #threadCodePost
+
+
+    def processMsgConnected(self, message: msg.protocol.MsgConnected):
+        if message.clientID in self._clients:
+            _logger.error(f"client {message.clientID} already exists; ignoring 'new' "
+                          f"connection")
+            return
+        else:
+            self._clients[message.clientID] = ClientData()
+            _logger.info("clients:", self._clients)
+        #else
+    #processMsgConnected
+
+
+    def processMsgDisconnected(self, message: msg.protocol.MsgDisconnected):
+        if message.clientID not in self._clients:
+            _logger.error(f"client {message.clientID} does not exists; ignoring 'new' "
+                          f"disconnection")
+            return
+        elif not self._clients[message.clientID].connected:
+            _logger.error(f"client {message.clientID} already marked as disconnected; ignoring "
+                          f"'new' disconnection")
+            return
+        else:
+            self._clients[message.clientID].connected = False
+            _logger.info("clients:", self._clients)
+        #else
+    #processMsgDisconnected
 
 
     def processMsgAck(self, message: msg.server.MsgAck):
@@ -482,6 +526,18 @@ class Server(czthreading.ReactiveThread):
         #except
         self.comm(msg.server.MsgAllocate())
     #processMsgLoadAll
+
+
+    def _makeDataDir(self):
+        try:
+            os.makedirs(self._dataDir)
+            _logger.info("Server: writing data to", self._dataDir)
+        except OSError as e:
+            errorString = f"Server: cannot create data dir '{self._dataDir}': {e}"
+            _logger.error(errorString)
+            raise ServerError(errorString)
+        #except
+    #_makeDataDir
 
 
     def _dumpAll(self):
