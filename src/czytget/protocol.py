@@ -65,6 +65,7 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
         _logger.info(self._communicator.clientName(clientID), "connected")
         if self._subscriber:
             self._subscriber.comm(msg.protocol.MsgConnected(clientID))
+        #if
     #_cbkConnected
 
 
@@ -72,6 +73,7 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
         _logger.info(self._communicator.clientName(clientID), "disconnected")
         if self._subscriber:
             self._subscriber.comm(msg.protocol.MsgDisconnected(clientID))
+        #if
     #_cbkDisconnected
 
 
@@ -99,6 +101,7 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
                         _logger.info(f"sending '{decoded}' to subscriber")
                         if self._subscriber:
                             self._subscriber.comm(decoded)
+                        #if
                     else:
                         _logger.warning(f"{decoded} is not a valid message; discarding")
                     #else

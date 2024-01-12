@@ -13,11 +13,12 @@
 """czytget client"""
 
 from . import __version__, __author__
-from . import config, msg, protocol, czcommunicator
+from . import config, msg, protocol, czcommunicator, czcode2
 from .msg import client
 from czutils.utils import czlogging, czthreading
 import cmd
 import queue
+import threading
 
 
 _logger = czlogging.LoggingChannel("czytget.client",
@@ -39,7 +40,12 @@ class ClientError(Exception):
 #ClientError
 
 
-class Client(czthreading.Thread, cmd.Cmd):
+class KillSwitch(Exception):
+    pass
+#KillSwitch
+
+
+class Client(czthreading.ReactiveThread, cmd.Cmd):
     """
     An "integrated" czytget client that talks directly with the server via
     message passing (without additional protocol).  Meant to run in the same
@@ -49,7 +55,7 @@ class Client(czthreading.Thread, cmd.Cmd):
     """
 
     def __init__(self, conf: config.ClientConfig, commConfig: config.CommConfig):
-        super().__init__("czytget.client")
+        super().__init__("czytget.client", 1)
         self._config = conf
         try:
             self._connector = protocol.Protocol(commConfig, False, self)
@@ -57,15 +63,35 @@ class Client(czthreading.Thread, cmd.Cmd):
             _logger.error(e)
             raise ClientError(f"communication error: {e}")
         #except
+        self._processingMessages = True
+        self._msgLoop = threading.Thread(target=self._messageLoop,
+                                         name="czytget.client.msgLoop",
+                                         daemon=True)
+        self._cmdLoopRunning = False
+        self._killSwitch = None
     #__init__
 
 
     def threadCode(self):
+        self._msgLoop.start()
+        self._connector.start()
+
         self.prompt = "\nczytget> "
         self.intro = f"czytget client v.{__version__}" \
                      f"\n{__author__}\n" \
                      "\nType 'help' or '?' to list commands."
-        self.cmdloop()
+        self._cmdLoopRunning = True
+        try:
+            self.cmdloop()
+        except KillSwitch:
+            self.stdout.write(self._killSwitch)
+        #except
+        self._cmdLoopRunning = False
+
+        self._connector.stop()
+        self._connector.wait()
+        self._processingMessages = False
+        self._msgLoop.join()
     #threadCode
 
 
@@ -85,6 +111,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param arg: ignored
         :returns: False
         """
+        self._checkKillSwitch()
+
         self.stdout.write("\nCommands")
         self.stdout.write("\n========")
         self.stdout.write("\n")
@@ -126,6 +154,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: space-separated list of YT codes.
         :return: False
         """
+        self._checkKillSwitch()
+
         codes = args.split()
         if len(codes) == 0:
             self._error("add: YT code expected")
@@ -155,6 +185,8 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: space-separated list of file names.
         :return: False
         """
+        self._checkKillSwitch()
+
         files = args.split()
         if len(files) == 0:
             self._error("add: filename expected")
@@ -187,6 +219,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         self._connector.send(msg.client.MsgRetry())
         return False # on true, prompt loop will end
     #do_r
@@ -198,6 +233,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         self._connector.send(msg.client.MsgDiscard())
         return False # on true, prompt loop will end
     #do_d
@@ -209,6 +247,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         responseBuffer = queue.Queue()
         self._connector.send(msg.client.MsgList(responseBuffer))
         self._getResponse(responseBuffer)
@@ -222,6 +263,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         responseBuffer = queue.Queue()
         self._connector.send(msg.client.MsgSessionList(responseBuffer))
         self._getResponse(responseBuffer)
@@ -235,6 +279,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         sessions = args.split()
         if len(sessions) == 0:
             self._error("add: YT code expected")
@@ -256,6 +303,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         responseBuffer = queue.Queue()
         self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.ALL,
                                                    responseBuffer))
@@ -270,6 +320,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         responseBuffer = queue.Queue()
         self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.FINISHED_ONLY,
                                                    responseBuffer))
@@ -284,6 +337,9 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: False
         """
+        czcode2.nop(args)
+        self._checkKillSwitch()
+
         responseBuffer = queue.Queue()
         self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.PENDING_ONLY,
                                                    responseBuffer))
@@ -298,10 +354,43 @@ class Client(czthreading.Thread, cmd.Cmd):
         :param args: ignored
         :return: True
         """
-        _logger.info("terminating server")
-        self._connector.send(czthreading.QuitMessage())
+        czcode2.nop(self, args)
         return True # on true, prompt loop will end
     #do_q
+
+
+    def _checkKillSwitch(self):
+        if self._killSwitch:
+            raise KillSwitch
+        #if
+    #_checkKillSwitch
+
+
+    def _messageLoop(self) -> None:
+        while self._processingMessages:
+            try:
+                message = self._messages.get(block = True,
+                                             timeout = self._messageWaitingTime)
+                messageType = message.msgType()
+                _logger.info(f"received {message}")
+                if messageType == "MsgConnected":
+                    pass
+                elif messageType == "MsgDisconnected":
+                    if self._cmdLoopRunning:
+                        _logger.warning("connection to server interrupted; client has to close")
+                        self._killSwitch = ("error: connection to server interrupted; client has "
+                                            "to close\n")
+                    #if
+                elif messageType == "MsgResponse":
+                    raise NotImplementedError
+                else:
+                    _logger.warning(f"don't know what to do with messages of type {messageType}")
+                #else
+            except queue.Empty:
+                pass
+            #except
+        #while
+    #_messageLoop
 
 
     def _error(self, *args) -> None:

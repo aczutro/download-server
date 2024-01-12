@@ -13,7 +13,7 @@
 """czytget server"""
 
 from . import __version__, __author__
-from . import config, ytconnector, protocol, czcommunicator, msg
+from . import config, ytconnector, protocol, czcommunicator, msg, czcode2
 from .msg import server, client
 from czutils.utils import czlogging, czthreading, cztext
 import datetime
@@ -199,19 +199,7 @@ def _printQueue(q: set, label: str) -> str:
 #_printQueue
 
 
-def autoRepr(cls):
-    """
-    Decorator: auto-generates __repr__ method for the given class.
-    """
-    cls.__repr__ = lambda self : \
-        "%s { %s }" \
-        % (type(self).__name__,
-           ", ".join("%s=%s" % dictEntry for dictEntry in vars(self).items()))
-    return cls
-#autoStr
-
-
-@autoRepr
+@czcode2.autoRepr
 class ClientData:
     def __init__(self):
         self.connected = True
