@@ -13,7 +13,7 @@
 """Communicator for czytgetd and czytget"""
 
 from . import config, czcommunicator, msg
-from .msg import protocol
+from .msg import protocol, client
 from czutils.utils import czthreading, czlogging
 import queue
 
@@ -98,6 +98,9 @@ class Protocol(czthreading.Thread, czcommunicator.Subscriber):
                     _logger.warning(f"{decoded} is not a valid message; discarding")
                 else:
                     if issubclass(type(decoded), czthreading.Message):
+                        if issubclass(type(decoded), msg.client.BaseMsg):
+                            decoded.clientID = packet.sender
+                        #if
                         _logger.info(f"sending '{decoded}' to subscriber")
                         if self._subscriber:
                             self._subscriber.comm(decoded)

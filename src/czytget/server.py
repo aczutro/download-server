@@ -11,7 +11,6 @@
 ################################################################### aczutro ###
 
 """czytget server"""
-
 from . import __version__, __author__
 from . import config, ytconnector, protocol, czcommunicator, msg, czcode2
 from .msg import server, client
@@ -71,7 +70,7 @@ class Worker(czthreading.ReactiveThread):
 
     def free(self) -> bool:
         """
-        :returns: True if it is not working.
+        :returns: True if worker is not working.
         """
         return self._free
     #free
@@ -83,28 +82,10 @@ class Worker(czthreading.ReactiveThread):
         back to the server when the processing is finished.
         """
         self._free = False
-        ytCode = message.ytCode
-        success = self._processCode(ytCode)
-        self._server.comm(msg.server.MsgAck(ytCode, success))
+        success, errorMsg = self._ytdl.download(message.job.ytCode)
+        self._server.comm(msg.server.MsgAck(message.job, success, errorMsg))
         self._free = True
     #processMsgTask
-
-
-    def _processCode(self, ytCode: str) -> bool:
-        """
-        Processes a YT code.
-
-        :returns: True if successful.
-        """
-        successful, errorMsg = self._ytdl.download(ytCode)
-        if successful:
-            _logger.info("[%s] download succeeded:" % ytCode)
-        else:
-            _logger.error("[%s] download failed:" % ytCode, errorMsg)
-        #else
-        return successful
-    #__processCode
-
 #Worker
 
 
@@ -222,7 +203,7 @@ class Server(czthreading.ReactiveThread):
     def __init__(self, conf: config.ServerConfig, commConfig: config.CommConfig):
         super().__init__('czytget.server', 1)
 
-        self._stdout = czlogging.LoggingChannel(czsystem.appName(),
+        self._stdout = czlogging.LoggingChannel(":",
                                                 czlogging.LoggingLevel.INFO,
                                                 colour=False)
         self._dataDir \
@@ -247,10 +228,10 @@ class Server(czthreading.ReactiveThread):
         self._processingFile = os.path.join(self._dataDir, _PROCESSING_FILE)
         self._queuedFile = os.path.join(self._dataDir, _QUEUED_FILE)
 
-        self._failedCodes = set()
-        self._queuedCodes = set()
-        self._processingCodes = set()
-        self._finishedCodes = set()
+        self._queuedJobs = set()
+        self._failedJobs = {}
+        self._runningJobs = {}
+        self._finishedJobs = {}
 
         try:
             self._connector = protocol.Protocol(commConfig, True, self)
@@ -262,12 +243,12 @@ class Server(czthreading.ReactiveThread):
         self.addMessageProcessor("MsgConnected", self.processMsgConnected)
         self.addMessageProcessor("MsgDisconnected", self.processMsgDisconnected)
         self.addMessageProcessor("MsgAck", self.processMsgAck)
+        self.addMessageProcessor("MsgAllocate", self.processMsgAllocate)
         self.addMessageProcessor("MsgAddCode", self.processMsgAddCode)
         self.addMessageProcessor("MsgAddList", self.processMsgAddList)
         self.addMessageProcessor("MsgRetry", self.processMsgRetry)
         self.addMessageProcessor("MsgDiscard", self.processMsgDiscard)
         self.addMessageProcessor("MsgList", self.processMsgList)
-        self.addMessageProcessor("MsgAllocate", self.processMsgAllocate)
         self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
         self.addMessageProcessor("MsgLoadSession", self.processMsgLoadSession)
         self.addMessageProcessor("MsgLoadAll", self.processMsgLoadAll)
@@ -285,7 +266,6 @@ class Server(czthreading.ReactiveThread):
 
 
     def threadCodePost(self):
-        print("stopping czytget server")
         self._connector.stop()
         self._connector.wait()
         cookieFiles = []
@@ -308,6 +288,7 @@ class Server(czthreading.ReactiveThread):
         else:
             self._clients[message.clientID] = ClientData()
             _logger.info("clients:", self._clients)
+            self._stdout.info(f"client {message.clientID} connected")
         #else
     #processMsgConnected
 
@@ -324,23 +305,50 @@ class Server(czthreading.ReactiveThread):
         else:
             self._clients[message.clientID].connected = False
             _logger.info("clients:", self._clients)
+            self._stdout.info(f"client {message.clientID} disconnected")
         #else
     #processMsgDisconnected
 
 
     def processMsgAck(self, message: msg.server.MsgAck):
         _logger.info("received", message)
-        self._processingCodes.remove(message.ytCode)
+        self._runningJobs[message.job.clientID].remove(message.job.ytCode)
         if message.success:
-            self._finishedCodes.add(message.ytCode)
-            self._stdout.info(f"YT code '{message.ytCode}' successfully downloaded")
+            if message.job.clientID not in self._finishedJobs:
+                self._finishedJobs[message.job.clientID] = set()
+            #if
+            self._finishedJobs[message.job.clientID].add(message.job.ytCode)
+            self._stdout.info(f"{message.job}: successful")
         else:
-            self._failedCodes.add(message.ytCode)
-            self._stdout.error(f"YT code '{message.ytCode}' failed")
+            if message.job.clientID not in self._failedJobs:
+                self._failedJobs[message.job.clientID] = set()
+            #if
+            self._failedJobs[message.job.clientID].add(message.job.ytCode)
+            self._stdout.error(f"{message.job}: failed: {message.errorMsg}")
         #if
         self._dumpAll()
         self.comm(msg.server.MsgAllocate())
     #processMsgAck
+
+
+    def processMsgAllocate(self, message: msg.server.MsgAllocate):
+        for worker in self._workers:
+            if worker.free():
+                try:
+                    job = self._queuedJobs.pop()
+                except KeyError:
+                    continue
+                #except
+                if job.clientID not in self._runningJobs:
+                    self._runningJobs[job.clientID] = set()
+                #if
+                self._runningJobs[job.clientID].add(job.ytCode)
+                self._dumpQueued()
+                self._dumpProcessing()
+                worker.comm(msg.server.MsgTask(job))
+            #if
+        #for
+    #processMsgAllocate
 
 
     def processMsgAddCode(self, message: msg.client.MsgAddCode):
@@ -348,27 +356,31 @@ class Server(czthreading.ReactiveThread):
         Processes a message of type MsgAdd, i.e. adds message.ytCode to the
         processing queue and sends a response message to the client.
         """
-        ytCode = message.ytCode
-        if ytCode in self._processingCodes:
+        if message.clientID in self._runningJobs \
+                and message.ytCode in self._runningJobs[message.clientID]:
             response = msg.server.MsgResponse(
                 message.queryID,
                 f"YT code '{message.ytCode}' already being processed")
-            self._stdout.info(f"client ???: {response.text}") #todo
-        elif ytCode in self._finishedCodes:
+            self._stdout.info(f"client {message.clientID}: {response.text}")
+            self._connector.send(response, message.clientID)
+        elif message.clientID in self._finishedJobs \
+                and message.ytCode in self._finishedJobs[message.clientID]:
             response = msg.server.MsgResponse(
                 message.queryID,
                 f"YT code '{message.ytCode}' already processed")
-            self._stdout.info(f"client ???: {response.text}") #todo
+            self._stdout.info(f"client {message.clientID}: {response.text}")
+            self._connector.send(response, message.clientID)
         else:
+            job = msg.server.Job(message.clientID, message.ytCode)
             response = msg.server.MsgResponse(
                 message.queryID,
                 f"YT code '{message.ytCode}' queued")
-            self._stdout.info(f"client ???: {response.text}") #todo
-            self._queuedCodes.add(ytCode)
+            self._stdout.info(f"{job} queued")
+            self._connector.send(response, message.clientID)
+            self._queuedJobs.add(job)
             self._dumpQueued()
             self.comm(msg.server.MsgAllocate())
         #else
-
     #processMsgAddCode
 
 
@@ -397,8 +409,8 @@ class Server(czthreading.ReactiveThread):
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
         """
-        self._queuedCodes.update(self._failedCodes)
-        self._failedCodes.clear()
+        self._queuedJobs.update(self._failedJobs)
+        self._failedJobs.clear()
         self._dumpQueued()
         self._dumpFailed()
         self.comm(msg.server.MsgAllocate())
@@ -410,7 +422,7 @@ class Server(czthreading.ReactiveThread):
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
         """
-        self._failedCodes.clear()
+        self._failedJobs.clear()
         self._dumpFailed()
     #processMsgDiscard
 
@@ -422,37 +434,20 @@ class Server(czthreading.ReactiveThread):
         'message.responseBuffer'.  'message.responseBuffer' must not be None.
         """
         message.responseBuffer.put('\n'.join([ s for s in [
-            _printQueue(self._finishedCodes,
+            _printQueue(self._finishedJobs,
                         cztext.colourise("finished codes:",
                                          foreground=cztext.Col16.GREEN)),
-            _printQueue(self._failedCodes,
+            _printQueue(self._failedJobs,
                         cztext.colourise("failed codes:",
                                          foreground=cztext.Col16.RED)),
-            _printQueue(self._processingCodes,
+            _printQueue(self._runningJobs,
                         cztext.colourise("codes in process:",
                                          foreground=cztext.Col16.BLUE)),
-            _printQueue(self._queuedCodes,
+            _printQueue(self._queuedJobs,
                         cztext.colourise("queued codes:",
                                          foreground=cztext.Col16.YELLOW))
         ] if len(s) ]))
     #processMsgList
-
-
-    def processMsgAllocate(self, message: msg.server.MsgAllocate):
-        for worker in self._workers:
-            if worker.free():
-                try:
-                    ytCode = self._queuedCodes.pop()
-                    self._processingCodes.add(ytCode)
-                    self._dumpQueued()
-                    self._dumpProcessing()
-                    worker.comm(msg.server.MsgTask(ytCode))
-                except KeyError:
-                    pass
-                #except
-            #if
-        #for
-    #processMsgAllocate
 
 
     def processMsgSessionList(self, message: msg.client.MsgSessionList):
@@ -472,13 +467,13 @@ class Server(czthreading.ReactiveThread):
         #if
         if selection in [ msg.client.LoadAllSelection.ALL,
                           msg.client.LoadAllSelection.PENDING_ONLY ]:
-            self._queuedCodes.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
-            self._queuedCodes.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
-            self._failedCodes.update(_loadFile(os.path.join(session, _FAILED_FILE)))
+            self._queuedJobs.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
+            self._queuedJobs.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
+            self._failedJobs.update(_loadFile(os.path.join(session, _FAILED_FILE)))
         #if
         if selection in [ msg.client.LoadAllSelection.ALL,
                           msg.client.LoadAllSelection.FINISHED_ONLY ]:
-            self._finishedCodes.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
+            self._finishedJobs.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
         #if
     #_loadSession
 
@@ -539,19 +534,23 @@ class Server(czthreading.ReactiveThread):
     #_dumpAll
 
     def _dumpFinished(self):
-        _dumpFile(self._finishedFile, self._finishedCodes)
+        pass # todo
+        _dumpFile(self._finishedFile, self._finishedJobs)
     #_dumpFinished
 
     def _dumpProcessing(self):
-        _dumpFile(self._processingFile, self._processingCodes)
+        pass # todo
+        _dumpFile(self._processingFile, self._runningJobs)
     #_dumpProcessing
 
     def _dumpQueued(self):
-        _dumpFile(self._queuedFile, self._queuedCodes)
+        pass # todo
+        _dumpFile(self._queuedFile, self._queuedJobs)
     #_dumpQueued
 
     def _dumpFailed(self):
-        _dumpFile(self._failedFile, self._failedCodes)
+        pass # todo
+        _dumpFile(self._failedFile, self._failedJobs)
     #_dumpFailed
 
 #Server

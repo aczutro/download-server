@@ -13,20 +13,40 @@
 """
 Messages sent by client.
 """
-
 from czutils.utils import czthreading
 import queue
 import time
 
 
-class MsgAddCode(czthreading.Message):
+class BaseMsg(czthreading.Message):
+    """
+    Base message class for client requests
+    """
+    def __init__(self):
+        super().__init__()
+        self.clientID = -1
+    #__init__
+#BaseMsg
+
+
+class RequestMsg(BaseMsg):
+    """
+    Base class for messages that expect a response from the server.
+    """
+    def __init__(self):
+        super().__init__()
+        self.queryID = time.monotonic_ns()
+    #__init__
+#MsgRequest
+
+
+class MsgAddCode(RequestMsg):
     """
     Add command sent by client to server.
     Interprets 'ytCode' as an individual code.
     """
     def __init__(self, ytCode: str):
         super().__init__()
-        self.queryID = time.monotonic_ns()
         self.ytCode = ytCode
     #__init__
 #MsgAddCode

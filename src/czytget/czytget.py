@@ -58,6 +58,7 @@ def czytgetd():
         theServer.stop()
     #except
 
+    print("-----------------------------------------------")
     sys.exit(0)
 #czytgetd
 

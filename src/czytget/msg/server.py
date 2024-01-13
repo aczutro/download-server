@@ -13,32 +13,33 @@
 """
 Messages sent by server components.
 """
-
 from czutils.utils import czthreading
+import collections
+
+
+Job = collections.namedtuple("Job", "clientID ytCode")
 
 
 class MsgTask(czthreading.Message):
     """
     Task sent by server to worker thread.
     """
-    def __init__(self, ytCode: str):
+    def __init__(self, job: Job):
         super().__init__()
-        self.ytCode = ytCode
+        self.job = job
     #__init__
-
 #MsgTask
 
 
-class MsgAck(czthreading.Message):
+class MsgAck(MsgTask):
     """
     Acknowledgement sent by worker thread to server.
     """
-    def __init__(self, ytCode: str, success: bool):
-        super().__init__()
-        self.ytCode = ytCode
+    def __init__(self, job: Job, success: bool, errorMsg: str):
+        super().__init__(job)
         self.success = success
+        self.errorMsg = errorMsg
     #__init__
-
 #MsgAck
 
 

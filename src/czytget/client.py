@@ -69,6 +69,7 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
                                          daemon=True)
         self._cmdLoopRunning = False
         self._killSwitch = None
+        self._responses = {}
     #__init__
 
 
@@ -84,7 +85,7 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         try:
             self.cmdloop()
         except KillSwitch:
-            self.stdout.write(self._killSwitch)
+            self._stderr(self._killSwitch)
         #except
         self._cmdLoopRunning = False
 
@@ -112,36 +113,36 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         """
         self._checkKillSwitch()
 
-        self.stdout.write("\nCommands")
-        self.stdout.write("\n========")
-        self.stdout.write("\n")
-        self.stdout.write("\na CODE [CODE ...]")
-        self.stdout.write("\n        add YT codes to the download list")
-        self.stdout.write("\n")
-        self.stdout.write("\nf FILE [FILE ...]")
-        self.stdout.write("\n        add all YT codes found in files to the download list")
-        self.stdout.write("\n")
-        self.stdout.write("\nl       list queued, processed and finished codes")
-        self.stdout.write("\n")
-        self.stdout.write("\nr       retry: queue all failed codes again")
-        self.stdout.write("\n")
-        self.stdout.write("\nd       discard: empty the queue of failed codes")
-        self.stdout.write("\n")
-        self.stdout.write("\nsls     'Session LS': list previous sessions")
-        self.stdout.write("\n")
-        self.stdout.write("\nsld SESSION [SESSION ...]")
-        self.stdout.write("\n        'Session LoaD': load session SESSION")
-        self.stdout.write("\n")
-        self.stdout.write("\nsla     'Session Load All': load all available sessions")
-        self.stdout.write("\n")
-        self.stdout.write("\nslf     'Session Load Finished': load all available sessions,")
-        self.stdout.write("\n        but only finished codes")
-        self.stdout.write("\n")
-        self.stdout.write("\nslp     'Session Load Pending': load all available sessions,")
-        self.stdout.write("\n        but only unfinished codes")
-        self.stdout.write("\n")
-        self.stdout.write("\nq       terminate the client")
-        self.stdout.write("\n")
+        self._stdout("""
+Commands
+========
+
+a CODE [CODE ...]
+        add YT codes to the download list
+
+f FILE [FILE ...]
+        add all YT codes found in files to the download list
+
+l       list queued, processed and finished codes
+
+r       retry: queue all failed codes again
+
+d       discard: empty the queue of failed codes
+
+sls     'Session LS': list previous sessions
+
+sld SESSION [SESSION ...]
+        'Session LoaD': load session SESSION
+
+sla     'Session Load All': load all available sessions
+
+slf     'Session Load Finished': load all available sessions,
+        but only finished codes
+
+slp     'Session Load Pending': load all available sessions,
+        but only unfinished codes
+
+q       terminate the client""")
         return False # on true, prompt loop will end
     #do_help
 
@@ -155,23 +156,18 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
 
         codes = args.split()
         if len(codes) == 0:
-            self._error("add: YT code expected")
+            self._stderr("add: YT code expected")
         else:
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    message = msg.client.MsgAddCode(ytCode)
-                    self._connector.send(message)
-                    self._waitForResponse(message.queryID)
-                    #self._getResponse(response)
+                    self._sendMessageAndWait(msg.client.MsgAddCode(ytCode))
                 elif len(ytCode) == 34:
                     _logger.info("adding code", ytCode)
-                    message = msg.client.MsgAddList(ytCode)
-                    self._connector.send(message)
-                    self._waitForResponse(message.queryID)
-                    #self._getResponse(response, multiLine=True)
+                    self._sendMessageAndWait(msg.client.MsgAddList(ytCode))
+                    #todo this had multiLine = True
                 else:
-                    self._error("bad YT code:", ytCode)
+                    self._stderr("bad YT code:", ytCode)
                 #else
             #for
         #else
@@ -189,7 +185,7 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
 
         files = args.split()
         if len(files) == 0:
-            self._error("add: filename expected")
+            self._stderr("add: filename expected")
         else:
             for file in files:
                 try:
@@ -197,15 +193,15 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
                         codes = f.read()
                     #with
                     if len(codes) == 0:
-                        self._error("file '%s' is empty" % file)
+                        self._stderr("file '%s' is empty" % file)
                     else:
                         _logger.info("adding file", file)
                         self.do_a(codes)
                     #else
                 except FileNotFoundError:
-                    self._error("file '%s' not found" % file)
+                    self._stderr("file '%s' not found" % file)
                 except PermissionError:
-                    self._error("no read permission for file '%s'" % file)
+                    self._stderr("no read permission for file '%s'" % file)
                 #except
             #for
         #else
@@ -284,7 +280,7 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
 
         sessions = args.split()
         if len(sessions) == 0:
-            self._error("add: YT code expected")
+            self._stderr("add: YT code expected")
         else:
             response = queue.Queue(maxsize=1)
             for session in sessions:
@@ -377,12 +373,11 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
                     pass
                 elif messageType == "MsgDisconnected":
                     if self._cmdLoopRunning:
-                        _logger.warning("connection to server interrupted; client has to close")
-                        self._killSwitch = ("error: connection to server interrupted; client has "
-                                            "to close\n")
+                        self._killSwitch = "connection to server interrupted; client has to close"
+                        _logger.warning(self._killSwitch)
                     #if
                 elif messageType == "MsgResponse":
-                    raise NotImplementedError
+                    self._responses[message.queryID].put(message.text)
                 else:
                     _logger.warning(f"don't know what to do with messages of type {messageType}")
                 #else
@@ -393,7 +388,42 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
     #_messageLoop
 
 
-    def _error(self, *args) -> None:
+    def _sendMessageAndWait(self, message: msg.client.RequestMsg, longTimeout=False):
+        self._responses[message.queryID] = queue.Queue()
+        self._connector.send(message)
+        self._waitForResponse(message.queryID, longTimeout)
+    #_sendMessageAndWait
+
+
+    def _waitForResponse(self, queryID: int, longTimeout=False) -> None:
+        """
+        Waits for response message from the server and prints the message to
+        STDOUT.
+
+        In case of timeout, prints an error message.
+        """
+        try:
+            self._stdout(
+                self._responses[queryID].get(
+                    block = True,
+                    timeout = (self._config.longResponseTimeout if longTimeout
+                               else self._config.responseTimeout)))
+        except queue.Empty:
+            self._stderr("server response timeout")
+        #except
+    #_waitForResponse
+
+
+    def _stdout(self, *args) -> None:
+        """
+        Prints message.
+        """
+        self.stdout.write(' '.join(args))
+        self.stdout.write("\n")
+    #_error
+
+
+    def _stderr(self, *args) -> None:
         """
         Prints error message.
         """
@@ -401,54 +431,6 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         self.stdout.write(' '.join(args))
         self.stdout.write("\n")
     #_error
-
-
-    def _getResponse(self, responseBuffer: queue.Queue, multiLine=False) -> None:
-        """
-        Waits for a message (string) to be put into 'responseBuffer' and prints
-        the message to STDOUT.
-        In case of timeout, prints an error message.
-        """
-
-        # at least one response string must arrive
-        try:
-            self.stdout.write(
-                responseBuffer.get(
-                    block = True,
-                    timeout = self._config.longResponseTimeout \
-                        if multiLine else self._config.responseTimeout
-                ))
-            self.stdout.write("\n")
-        except queue.Empty:
-            self._error("server response timeout")
-        #except
-
-        # additional response strings are optional
-        if multiLine:
-            while True:
-                try:
-                    self.stdout.write(
-                        responseBuffer.get(
-                            block = True,
-                            timeout = self._config.shortResponseTimeout))
-                    self.stdout.write("\n")
-                except queue.Empty:
-                    return
-                #except
-            #while
-        #if
-    #_getResponse
-
-
-    def _waitForResponse(self, queryID: int) -> None:
-        """
-        Waits for response message from the server and prints the message to
-        STDOUT.
-
-        In case of timeout, prints an error message.
-        """
-        pass
-    #_waitForResponse
 
 #Client
 

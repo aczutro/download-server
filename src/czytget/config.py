@@ -224,7 +224,7 @@ class ClientConfig:
     def __init__(self):
         self.responseTimeout = 10. # seconds
         self.longResponseTimeout = 10 * 60. # seconds
-        self.shortResponseTimeout = 2. # seconds
+        self.shortResponseTimeout = 2. # seconds # todo delete if applicable
     #__init__
 
 
