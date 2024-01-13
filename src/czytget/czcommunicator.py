@@ -12,6 +12,7 @@
 
 """Socket communicator."""
 
+from . import czcode2
 from czutils.utils import czthreading, czlogging, czcode
 import collections
 import pickle
@@ -366,6 +367,7 @@ class Serialiser:
 
 
     def _pickle(self, obj) -> bytes:
+        czcode2.nop(self)
         try:
             return pickle.dumps(obj, protocol=5)
         except pickle.PickleError as e:
@@ -375,6 +377,7 @@ class Serialiser:
 
 
     def _unpickle(self, data: bytes):
+        czcode2.nop(self)
         try:
             return pickle.loads(data)
         except pickle.PickleError as e:

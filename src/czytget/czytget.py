@@ -24,10 +24,10 @@ def czytgetd():
     logger = czlogging.LoggingChannel(czsystem.appName(),
                                       czlogging.LoggingLevel.WARNING)
     # czsystem.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # czthreading.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
     server.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)

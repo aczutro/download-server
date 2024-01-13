@@ -101,7 +101,6 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         :returns: False
         """
         return False # on true, prompt loop will end
-
     #emptyline
 
 
@@ -144,15 +143,13 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         self.stdout.write("\nq       terminate the client")
         self.stdout.write("\n")
         return False # on true, prompt loop will end
-
     #do_help
 
 
     def do_a(self, args: str) -> bool:
-        """
-        Implements the ADD command.
+        """ Implements the ADD command.
+
         :param args: space-separated list of YT codes.
-        :return: False
         """
         self._checkKillSwitch()
 
@@ -160,16 +157,19 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
         if len(codes) == 0:
             self._error("add: YT code expected")
         else:
-            response = queue.Queue(maxsize=1)
             for ytCode in codes:
                 if len(ytCode) == 11:
                     _logger.info("adding code", ytCode)
-                    self._connector.send(msg.client.MsgAddCode(ytCode, response))
-                    self._getResponse(response)
+                    message = msg.client.MsgAddCode(ytCode)
+                    self._connector.send(message)
+                    self._waitForResponse(message.queryID)
+                    #self._getResponse(response)
                 elif len(ytCode) == 34:
                     _logger.info("adding code", ytCode)
-                    self._connector.send(msg.client.MsgAddList(ytCode, response))
-                    self._getResponse(response, multiLine=True)
+                    message = msg.client.MsgAddList(ytCode)
+                    self._connector.send(message)
+                    self._waitForResponse(message.queryID)
+                    #self._getResponse(response, multiLine=True)
                 else:
                     self._error("bad YT code:", ytCode)
                 #else
@@ -438,6 +438,17 @@ class Client(czthreading.ReactiveThread, cmd.Cmd):
             #while
         #if
     #_getResponse
+
+
+    def _waitForResponse(self, queryID: int) -> None:
+        """
+        Waits for response message from the server and prints the message to
+        STDOUT.
+
+        In case of timeout, prints an error message.
+        """
+        pass
+    #_waitForResponse
 
 #Client
 

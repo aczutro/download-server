@@ -16,6 +16,7 @@ Messages sent by client.
 
 from czutils.utils import czthreading
 import queue
+import time
 
 
 class MsgAddCode(czthreading.Message):
@@ -23,26 +24,20 @@ class MsgAddCode(czthreading.Message):
     Add command sent by client to server.
     Interprets 'ytCode' as an individual code.
     """
-    def __init__(self, ytCode: str, responseBuffer: queue.Queue):
+    def __init__(self, ytCode: str):
         super().__init__()
+        self.queryID = time.monotonic_ns()
         self.ytCode = ytCode
-        self.responseBuffer = responseBuffer
     #__init__
-
 #MsgAddCode
 
 
-class MsgAddList(czthreading.Message):
+class MsgAddList(MsgAddCode):
     """
     Add command sent by client to server.
     Interprets 'ytCode' as a playlist code.
     """
-    def __init__(self, ytCode: str, responseBuffer: queue.Queue):
-        super().__init__()
-        self.ytCode = ytCode
-        self.responseBuffer = responseBuffer
-    #__init__
-
+    pass
 #MsgAddList
 
 

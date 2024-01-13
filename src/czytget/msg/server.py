@@ -59,9 +59,10 @@ class MsgResponse(czthreading.Message):
     """
     Response sent by server to client.
     """
-    def __init__(self, code: int):
+    def __init__(self, queryID: int, text: str):
         super().__init__()
-        self.code = code
+        self.queryID = queryID
+        self.text = text
     #__init__
 #MsgResponse
 

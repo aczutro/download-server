@@ -15,7 +15,7 @@
 from . import __version__, __author__
 from . import config, ytconnector, protocol, czcommunicator, msg, czcode2
 from .msg import server, client
-from czutils.utils import czlogging, czthreading, cztext
+from czutils.utils import czlogging, czthreading, cztext, czsystem
 import datetime
 import os
 import pickle
@@ -46,9 +46,9 @@ class Worker(czthreading.ReactiveThread):
     A worker thread that processes a YT code on demand.
     """
 
-    def __init__(self, threadName: str, ytConfig: ytconnector.YTConfig, server):
+    def __init__(self, threadName: str, ytConfig: ytconnector.YTConfig, theServer):
         super().__init__(threadName, 1)
-        self._server = server
+        self._server = theServer
         self._free = True
         self.addMessageProcessor("MsgTask", self.processMsgTask)
         self._cookies = ytConfig.cookies
@@ -222,6 +222,9 @@ class Server(czthreading.ReactiveThread):
     def __init__(self, conf: config.ServerConfig, commConfig: config.CommConfig):
         super().__init__('czytget.server', 1)
 
+        self._stdout = czlogging.LoggingChannel(czsystem.appName(),
+                                                czlogging.LoggingLevel.INFO,
+                                                colour=False)
         self._dataDir \
             = os.path.join(conf.dataDir,
                            datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
@@ -327,13 +330,13 @@ class Server(czthreading.ReactiveThread):
 
     def processMsgAck(self, message: msg.server.MsgAck):
         _logger.info("received", message)
-        ytCode = message.ytCode
-        success = message.success
-        self._processingCodes.remove(ytCode)
-        if success:
-            self._finishedCodes.add(ytCode)
+        self._processingCodes.remove(message.ytCode)
+        if message.success:
+            self._finishedCodes.add(message.ytCode)
+            self._stdout.info(f"YT code '{message.ytCode}' successfully downloaded")
         else:
-            self._failedCodes.add(ytCode)
+            self._failedCodes.add(message.ytCode)
+            self._stdout.error(f"YT code '{message.ytCode}' failed")
         #if
         self._dumpAll()
         self.comm(msg.server.MsgAllocate())
@@ -343,24 +346,24 @@ class Server(czthreading.ReactiveThread):
     def processMsgAddCode(self, message: msg.client.MsgAddCode):
         """
         Processes a message of type MsgAdd, i.e. adds message.ytCode to the
-        processing queue and, if message.responseBuffer is not None, puts a
-        response string into it.
+        processing queue and sends a response message to the client.
         """
         ytCode = message.ytCode
         if ytCode in self._processingCodes:
-            if message.responseBuffer is not None:
-                message.responseBuffer.put("YT code '%s' already being processed"
-                                           % message.ytCode)
-            #if
+            response = msg.server.MsgResponse(
+                message.queryID,
+                f"YT code '{message.ytCode}' already being processed")
+            self._stdout.info(f"client ???: {response.text}") #todo
         elif ytCode in self._finishedCodes:
-            if message.responseBuffer is not None:
-                message.responseBuffer.put("YT code '%s' already processed"
-                                           % message.ytCode)
-            #if
+            response = msg.server.MsgResponse(
+                message.queryID,
+                f"YT code '{message.ytCode}' already processed")
+            self._stdout.info(f"client ???: {response.text}") #todo
         else:
-            if message.responseBuffer is not None:
-                message.responseBuffer.put("YT code '%s' queued" % message.ytCode)
-            #if
+            response = msg.server.MsgResponse(
+                message.queryID,
+                f"YT code '{message.ytCode}' queued")
+            self._stdout.info(f"client ???: {response.text}") #todo
             self._queuedCodes.add(ytCode)
             self._dumpQueued()
             self.comm(msg.server.MsgAllocate())
