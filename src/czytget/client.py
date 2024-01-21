@@ -129,20 +129,22 @@ r       retry: queue all failed codes again
 
 d       discard: empty the queue of failed codes
 
-sls     'Session LS': list previous sessions
-
-sld SESSION [SESSION ...]
-        'Session LoaD': load session SESSION
-
-sla     'Session Load All': load all available sessions
-
-slf     'Session Load Finished': load all available sessions,
-        but only finished codes
-
-slp     'Session Load Pending': load all available sessions,
-        but only unfinished codes
-
 q       terminate the client""")
+
+# sls     'Session LS': list previous sessions
+#
+# sld SESSION [SESSION ...]
+#         'Session LoaD': load session SESSION
+#
+# sla     'Session Load All': load all available sessions
+#
+# slf     'Session Load Finished': load all available sessions,
+#         but only finished codes
+#
+# slp     'Session Load Pending': load all available sessions,
+#         but only unfinished codes
+#
+# q       terminate the client""")
         return False # on true, prompt loop will end
     #do_help
 
@@ -251,95 +253,95 @@ q       terminate the client""")
     #do_l
 
 
-    def do_sls(self, args) -> bool:
-        """
-        Implements SESSION LS command.
-        :param args: ignored
-        :return: False
-        """
-        czcode2.nop(args)
-        self._checkKillSwitch()
-
-        responseBuffer = queue.Queue()
-        self._connector.send(msg.client.MsgSessionList(responseBuffer))
-        self._getResponse(responseBuffer)
-        return False # on true, prompt loop will end
-    #do_sls
-
-
-    def do_sld(self, args) -> bool:
-        """
-        Implements SESSION LOAD command.
-        :param args: ignored
-        :return: False
-        """
-        czcode2.nop(args)
-        self._checkKillSwitch()
-
-        sessions = args.split()
-        if len(sessions) == 0:
-            self._stderr("add: YT code expected")
-        else:
-            response = queue.Queue(maxsize=1)
-            for session in sessions:
-                _logger.info("loading session", session)
-                self._connector.send(msg.client.MsgLoadSession(session, response))
-                self._getResponse(response)
-            #for
-        #else
-        return False # on true, prompt loop will end
-    #do_sld
+    # def do_sls(self, args) -> bool:
+    #     """
+    #     Implements SESSION LS command.
+    #     :param args: ignored
+    #     :return: False
+    #     """
+    #     czcode2.nop(args)
+    #     self._checkKillSwitch()
+    #
+    #     responseBuffer = queue.Queue()
+    #     self._connector.send(msg.client.MsgSessionList(responseBuffer))
+    #     self._getResponse(responseBuffer)
+    #     return False # on true, prompt loop will end
+    # #do_sls
 
 
-    def do_sla(self, args) -> bool:
-        """
-        Implements SESSION LOAD ALL command.
-        :param args: ignored
-        :return: False
-        """
-        czcode2.nop(args)
-        self._checkKillSwitch()
-
-        responseBuffer = queue.Queue()
-        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.ALL,
-                                                   responseBuffer))
-        self._getResponse(responseBuffer)
-        return False # on true, prompt loop will end
-    #do_sls
-
-
-    def do_slf(self, args) -> bool:
-        """
-        Implements SESSION LOAD FINISHED command.
-        :param args: ignored
-        :return: False
-        """
-        czcode2.nop(args)
-        self._checkKillSwitch()
-
-        responseBuffer = queue.Queue()
-        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.FINISHED_ONLY,
-                                                   responseBuffer))
-        self._getResponse(responseBuffer)
-        return False # on true, prompt loop will end
-    #do_slf
+    # def do_sld(self, args) -> bool:
+    #     """
+    #     Implements SESSION LOAD command.
+    #     :param args: ignored
+    #     :return: False
+    #     """
+    #     czcode2.nop(args)
+    #     self._checkKillSwitch()
+    #
+    #     sessions = args.split()
+    #     if len(sessions) == 0:
+    #         self._stderr("add: YT code expected")
+    #     else:
+    #         response = queue.Queue(maxsize=1)
+    #         for session in sessions:
+    #             _logger.info("loading session", session)
+    #             self._connector.send(msg.client.MsgLoadSession(session, response))
+    #             self._getResponse(response)
+    #         #for
+    #     #else
+    #     return False # on true, prompt loop will end
+    # #do_sld
 
 
-    def do_slp(self, args) -> bool:
-        """
-        Implements SESSION LOAD PENDING command.
-        :param args: ignored
-        :return: False
-        """
-        czcode2.nop(args)
-        self._checkKillSwitch()
+    # def do_sla(self, args) -> bool:
+    #     """
+    #     Implements SESSION LOAD ALL command.
+    #     :param args: ignored
+    #     :return: False
+    #     """
+    #     czcode2.nop(args)
+    #     self._checkKillSwitch()
+    #
+    #     responseBuffer = queue.Queue()
+    #     self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.ALL,
+    #                                                responseBuffer))
+    #     self._getResponse(responseBuffer)
+    #     return False # on true, prompt loop will end
+    # #do_sla
 
-        responseBuffer = queue.Queue()
-        self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.PENDING_ONLY,
-                                                   responseBuffer))
-        self._getResponse(responseBuffer)
-        return False # on true, prompt loop will end
-    #do_slp
+
+    # def do_slf(self, args) -> bool:
+    #     """
+    #     Implements SESSION LOAD FINISHED command.
+    #     :param args: ignored
+    #     :return: False
+    #     """
+    #     czcode2.nop(args)
+    #     self._checkKillSwitch()
+    #
+    #     responseBuffer = queue.Queue()
+    #     self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.FINISHED_ONLY,
+    #                                                responseBuffer))
+    #     self._getResponse(responseBuffer)
+    #     return False # on true, prompt loop will end
+    # #do_slf
+
+
+    # def do_slp(self, args) -> bool:
+    #     """
+    #     Implements SESSION LOAD PENDING command.
+    #     :param args: ignored
+    #     :return: False
+    #     """
+    #     czcode2.nop(args)
+    #     self._checkKillSwitch()
+    #
+    #     responseBuffer = queue.Queue()
+    #     self._connector.send(msg.client.MsgLoadAll(msg.client.LoadAllSelection.PENDING_ONLY,
+    #                                                responseBuffer))
+    #     self._getResponse(responseBuffer)
+    #     return False # on true, prompt loop will end
+    # #do_slp
 
 
     def do_q(self, args) -> bool:
@@ -418,7 +420,7 @@ q       terminate the client""")
         """
         self.stdout.write(' '.join(args))
         self.stdout.write("\n")
-    #_error
+    #_stdout
 
 
     def _stderr(self, *args) -> None:
@@ -428,7 +430,7 @@ q       terminate the client""")
         self.stdout.write("ERROR: ")
         self.stdout.write(' '.join(args))
         self.stdout.write("\n")
-    #_error
+    #_stderr
 
 #Client
 

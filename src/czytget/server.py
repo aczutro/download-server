@@ -257,9 +257,9 @@ class Server(czthreading.ReactiveThread):
         self.addMessageProcessor("MsgRetry", self.processMsgRetry)
         self.addMessageProcessor("MsgDiscard", self.processMsgDiscard)
         self.addMessageProcessor("MsgList", self.processMsgList)
-        self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
-        self.addMessageProcessor("MsgLoadSession", self.processMsgLoadSession)
-        self.addMessageProcessor("MsgLoadAll", self.processMsgLoadAll)
+        # self.addMessageProcessor("MsgSessionList", self.processMsgSessionList)
+        # self.addMessageProcessor("MsgLoadSession", self.processMsgLoadSession)
+        # self.addMessageProcessor("MsgLoadAll", self.processMsgLoadAll)
     #__init__
 
 
@@ -458,68 +458,68 @@ class Server(czthreading.ReactiveThread):
     #processMsgList
 
 
-    def processMsgSessionList(self, message: msg.client.MsgSessionList):
-        message.responseBuffer.put(
-            '\n'.join(_getSubdirs(os.path.dirname(self._dataDir))))
-    #processMsgDateList
+    # def processMsgSessionList(self, message: msg.client.MsgSessionList):
+    #     message.responseBuffer.put(
+    #         '\n'.join(_getSubdirs(os.path.dirname(self._dataDir))))
+    # #processMsgDateList
 
 
-    def _loadSession(self, session: str, selection: int):
-        """
-        :param selection: one of the constants defined in class
-                          MsgLoadAllSelection
-        """
-        _logger.info("loading", session)
-        if not os.path.exists(session):
-            raise ServerError("ERROR: session '%s' does not exist" % session)
-        #if
-        if selection in [ msg.client.LoadAllSelection.ALL,
-                          msg.client.LoadAllSelection.PENDING_ONLY ]:
-            self._queuedJobs.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
-            self._queuedJobs.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
-            self._failedJobs.update(_loadFile(os.path.join(session, _FAILED_FILE)))
-        #if
-        if selection in [ msg.client.LoadAllSelection.ALL,
-                          msg.client.LoadAllSelection.FINISHED_ONLY ]:
-            self._finishedJobs.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
-        #if
-    #_loadSession
+    # def _loadSession(self, session: str, selection: int):
+    #     """
+    #     :param selection: one of the constants defined in class
+    #                       MsgLoadAllSelection
+    #     """
+    #     _logger.info("loading", session)
+    #     if not os.path.exists(session):
+    #         raise ServerError("ERROR: session '%s' does not exist" % session)
+    #     #if
+    #     if selection in [ msg.client.LoadAllSelection.ALL,
+    #                       msg.client.LoadAllSelection.PENDING_ONLY ]:
+    #         self._queuedJobs.update(_loadFile(os.path.join(session, _PROCESSING_FILE)))
+    #         self._queuedJobs.update(_loadFile(os.path.join(session, _QUEUED_FILE)))
+    #         self._failedJobs.update(_loadFile(os.path.join(session, _FAILED_FILE)))
+    #     #if
+    #     if selection in [ msg.client.LoadAllSelection.ALL,
+    #                       msg.client.LoadAllSelection.FINISHED_ONLY ]:
+    #         self._finishedJobs.update(_loadFile(os.path.join(session, _FINISHED_FILE)))
+    #     #if
+    # #_loadSession
 
 
-    def processMsgLoadSession(self, message: msg.client.MsgLoadSession):
-        dataDir = os.path.join(os.path.dirname(self._dataDir), message.session)
-        try:
-            self._loadSession(dataDir, True)
-            if message.responseBuffer is not None:
-                message.responseBuffer.put("successfully loaded session '%s'"
-                                           % message.session)
-            #if
-        except ServerError as e:
-            if message.responseBuffer is not None:
-                message.responseBuffer.put(str(e))
-            #if
-        #except
-        self.comm(msg.server.MsgAllocate())
-    #processMsgLoadSession
+    # def processMsgLoadSession(self, message: msg.client.MsgLoadSession):
+    #     dataDir = os.path.join(os.path.dirname(self._dataDir), message.session)
+    #     try:
+    #         self._loadSession(dataDir, True)
+    #         if message.responseBuffer is not None:
+    #             message.responseBuffer.put("successfully loaded session '%s'"
+    #                                        % message.session)
+    #         #if
+    #     except ServerError as e:
+    #         if message.responseBuffer is not None:
+    #             message.responseBuffer.put(str(e))
+    #         #if
+    #     #except
+    #     self.comm(msg.server.MsgAllocate())
+    # #processMsgLoadSession
 
 
-    def processMsgLoadAll(self, message: msg.client.MsgLoadAll):
-        sessions = _getSubdirs(os.path.dirname(self._dataDir))
-        try:
-            for session in sessions:
-                self._loadSession(os.path.join(os.path.dirname(self._dataDir), session),
-                                  message.selection)
-            #for
-            if message.responseBuffer is not None:
-                message.responseBuffer.put("successfully loaded all sessions")
-            #if
-        except ServerError as e:
-            if message.responseBuffer is not None:
-                message.responseBuffer.put(str(e))
-            #if
-        #except
-        self.comm(msg.server.MsgAllocate())
-    #processMsgLoadAll
+    # def processMsgLoadAll(self, message: msg.client.MsgLoadAll):
+    #     sessions = _getSubdirs(os.path.dirname(self._dataDir))
+    #     try:
+    #         for session in sessions:
+    #             self._loadSession(os.path.join(os.path.dirname(self._dataDir), session),
+    #                               message.selection)
+    #         #for
+    #         if message.responseBuffer is not None:
+    #             message.responseBuffer.put("successfully loaded all sessions")
+    #         #if
+    #     except ServerError as e:
+    #         if message.responseBuffer is not None:
+    #             message.responseBuffer.put(str(e))
+    #         #if
+    #     #except
+    #     self.comm(msg.server.MsgAllocate())
+    # #processMsgLoadAll
 
 
     def _makeDataDir(self):

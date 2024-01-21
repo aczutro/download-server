@@ -51,11 +51,6 @@ class MsgAllocate(czthreading.Message):
 #MsgAllocate
 
 
-class Response:
-    OK, NOK = range(2)
-#Response
-
-
 class MsgResponse(czthreading.Message):
     """
     Response sent by server to client.

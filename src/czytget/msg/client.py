@@ -84,52 +84,52 @@ class MsgList(RequestMsg):
 #MsgList
 
 
-class MsgSessionList(czthreading.Message):
-    """
-    "Session ls" command sent by client to server.
-
-    The response buffer must not be None.
-    """
-    def __init__(self, responseBuffer: queue.Queue):
-        super().__init__()
-        self.responseBuffer = responseBuffer
-    #__init__
-#MsgSessionList
-
-
-class MsgLoadSession(czthreading.Message):
-    """
-    "Session load" command sent by client to server.
-    """
-    def __init__(self, session: str, responseBuffer: queue.Queue):
-        super().__init__()
-        self.session = session
-        self.responseBuffer = responseBuffer
-    #__init__
-#MsgLoadSession
+# class MsgSessionList(czthreading.Message):
+#     """
+#     "Session ls" command sent by client to server.
+#
+#     The response buffer must not be None.
+#     """
+#     def __init__(self, responseBuffer: queue.Queue):
+#         super().__init__()
+#         self.responseBuffer = responseBuffer
+#     #__init__
+# #MsgSessionList
 
 
-class LoadAllSelection:
-    ALL = 0,
-    PENDING_ONLY = -1,
-    FINISHED_ONLY = 1
-#LoadAllSelection
+# class MsgLoadSession(czthreading.Message):
+#     """
+#     "Session load" command sent by client to server.
+#     """
+#     def __init__(self, session: str, responseBuffer: queue.Queue):
+#         super().__init__()
+#         self.session = session
+#         self.responseBuffer = responseBuffer
+#     #__init__
+# #MsgLoadSession
 
 
-class MsgLoadAll(czthreading.Message):
-    """
-    "Session load all/pending" commands sent by client to server.
-    """
-    def __init__(self, selection: int, responseBuffer: queue.Queue):
-        """
-        :param selection: one of the constants defined in class
-                          LoadAllSelection
-        """
-        super().__init__()
-        self.selection = selection
-        self.responseBuffer = responseBuffer
-    #__init__
-#MsgLoadAll
+# class LoadAllSelection:
+#     ALL = 0,
+#     PENDING_ONLY = -1,
+#     FINISHED_ONLY = 1
+# #LoadAllSelection
+#
+#
+# class MsgLoadAll(czthreading.Message):
+#     """
+#     "Session load all/pending" commands sent by client to server.
+#     """
+#     def __init__(self, selection: int, responseBuffer: queue.Queue):
+#         """
+#         :param selection: one of the constants defined in class
+#                           LoadAllSelection
+#         """
+#         super().__init__()
+#         self.selection = selection
+#         self.responseBuffer = responseBuffer
+#     #__init__
+# #MsgLoadAll
 
 
 ### aczutro ###################################################################
