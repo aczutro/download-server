@@ -168,15 +168,23 @@ def _makeYTConfig(srcCookieFile: str, dstCookieFile:str, descriptions: bool) \
 #_copyCookies
 
 
-def _printQueue(q: set, label: str) -> str:
-    response = ""
-    if len(q):
-        response = label
-        for ytCode in q:
-            response = "%s\n  %s" % (response, ytCode)
-        #for
-    #if
-    return response
+def _printQueue(q: dict, k: int, label: str) -> str:
+    if k not in q:
+        return ""
+    else:
+        response = ""
+        if len(q[k]):
+            response = label
+            for item in q[k]:
+                if type(item) is str:
+                    response += f"\n  {item}"
+                else: # must be Job
+                    response += f"\n  {item.ytCode}"
+                #else
+            #for
+        #if
+        return response
+    #else
 #_printQueue
 
 
@@ -430,23 +438,23 @@ class Server(czthreading.ReactiveThread):
     def processMsgList(self, message: msg.client.MsgList):
         """
         Processes a message of type MsgList, creates a string listing the
-        contents of the internal code queue and puts the result into
-        'message.responseBuffer'.  'message.responseBuffer' must not be None.
+        contents of the internal code queue and sends the result in a MsgReponse
+        message.
         """
-        message.responseBuffer.put('\n'.join([ s for s in [
-            _printQueue(self._finishedJobs,
-                        cztext.colourise("finished codes:",
-                                         foreground=cztext.Col16.GREEN)),
-            _printQueue(self._failedJobs,
-                        cztext.colourise("failed codes:",
-                                         foreground=cztext.Col16.RED)),
-            _printQueue(self._runningJobs,
-                        cztext.colourise("codes in process:",
-                                         foreground=cztext.Col16.BLUE)),
-            _printQueue(self._queuedJobs,
-                        cztext.colourise("queued codes:",
-                                         foreground=cztext.Col16.YELLOW))
-        ] if len(s) ]))
+        response = msg.server.MsgResponse(
+            message.queryID,
+            '\n'.join([ s for s in [
+                _printQueue(self._finishedJobs, message.clientID,
+                            cztext.colourise("finished codes:", cztext.Col16.GREEN)),
+                _printQueue(self._failedJobs, message.clientID,
+                            cztext.colourise("failed codes:", cztext.Col16.RED)),
+                _printQueue(self._runningJobs, message.clientID,
+                            cztext.colourise("codes in process:", cztext.Col16.BLUE)),
+                _printQueue(self._queuedJobs, message.clientID,
+                            cztext.colourise("queued codes:", cztext.Col16.YELLOW))
+            ] if len(s) ]))
+        self._stdout.info(f"sending job lists to client {message.clientID}")
+        self._connector.send(response, message.clientID)
     #processMsgList
 
 

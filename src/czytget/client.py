@@ -246,9 +246,7 @@ q       terminate the client""")
         czcode2.nop(args)
         self._checkKillSwitch()
 
-        responseBuffer = queue.Queue()
-        self._connector.send(msg.client.MsgList(responseBuffer))
-        self._getResponse(responseBuffer)
+        self._sendMessageAndWait(msg.client.MsgList(), longTimeout=True)
         return False # on true, prompt loop will end
     #do_l
 

@@ -77,16 +77,10 @@ class MsgDiscard(czthreading.Message):
 #MsgDiscard
 
 
-class MsgList(czthreading.Message):
+class MsgList(RequestMsg):
+    """List command sent by client to server.
     """
-    List command sent by client to server.
-
-    The response buffer must not be None.
-    """
-    def __init__(self, responseBuffer: queue.Queue):
-        super().__init__()
-        self.responseBuffer = responseBuffer
-    #__init__
+    pass
 #MsgList
 
 
