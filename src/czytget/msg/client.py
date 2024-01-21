@@ -61,7 +61,7 @@ class MsgAddList(MsgAddCode):
 #MsgAddList
 
 
-class MsgRetry(czthreading.Message):
+class MsgRetry(RequestMsg):
     """
     Retry command sent by client to server.
     """
@@ -69,7 +69,7 @@ class MsgRetry(czthreading.Message):
 #MsgRetry
 
 
-class MsgDiscard(czthreading.Message):
+class MsgDiscard(RequestMsg):
     """
     Discard command sent by client to server.
     """

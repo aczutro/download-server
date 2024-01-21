@@ -417,10 +417,15 @@ class Server(czthreading.ReactiveThread):
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
         """
-        self._queuedJobs.update(self._failedJobs)
-        self._failedJobs.clear()
+        if message.clientID in self._failedJobs:
+            for ytCode in self._failedJobs[message.clientID]:
+                self._queuedJobs.add(msg.server.Job(message.clientID, ytCode))
+            #for
+            self._failedJobs[message.clientID].clear()
+        #if
         self._dumpQueued()
         self._dumpFailed()
+        self._stdout.info(f"client {message.clientID}: re-queing failed codes")
         self.comm(msg.server.MsgAllocate())
     #processMsgRetry
 
@@ -430,8 +435,11 @@ class Server(czthreading.ReactiveThread):
         Processes a message of type MsgRetry, i.e. moves all failed code back
         to the processing queue.
         """
-        self._failedJobs.clear()
+        if message.clientID in self._failedJobs:
+            self._failedJobs[message.clientID].clear()
+        #if
         self._dumpFailed()
+        self._stdout.info(f"client {message.clientID}: discarding failed codes")
     #processMsgDiscard
 
 
