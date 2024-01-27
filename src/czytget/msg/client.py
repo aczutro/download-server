@@ -14,7 +14,6 @@
 Messages sent by client.
 """
 from czutils.utils import czthreading
-import queue
 import time
 
 

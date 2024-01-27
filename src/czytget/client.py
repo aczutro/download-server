@@ -14,7 +14,7 @@
 
 from . import __version__, __author__
 from . import config, msg, protocol, czcommunicator, czcode2
-from .msg import client
+from .msg import client, server
 from czutils.utils import czlogging, czthreading
 import cmd
 import queue
@@ -162,12 +162,11 @@ q       terminate the client""")
         else:
             for ytCode in codes:
                 if len(ytCode) == 11:
-                    _logger.info("adding code", ytCode)
+                    _logger.info("adding video code", ytCode)
                     self._sendMessageAndWait(msg.client.MsgAddCode(ytCode))
                 elif len(ytCode) == 34:
-                    _logger.info("adding code", ytCode)
-                    self._sendMessageAndWait(msg.client.MsgAddList(ytCode))
-                    #todo this had multiLine = True
+                    _logger.info("adding list code", ytCode)
+                    self._sendMessageAndWait(msg.client.MsgAddList(ytCode), longTimeout=True)
                 else:
                     self._stderr("bad YT code:", ytCode)
                 #else
@@ -403,11 +402,11 @@ q       terminate the client""")
         In case of timeout, prints an error message.
         """
         try:
-            self._stdout(
-                self._responses[queryID].get(
-                    block = True,
-                    timeout = (self._config.longResponseTimeout if longTimeout
-                               else self._config.responseTimeout)))
+            response = self._responses[queryID].get(
+                block = True,
+                timeout = (self._config.longResponseTimeout if longTimeout
+                           else self._config.responseTimeout))
+            self._stdout(response)
         except queue.Empty:
             self._stderr("server response timeout")
         #except

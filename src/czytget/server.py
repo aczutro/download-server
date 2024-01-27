@@ -14,7 +14,7 @@
 from . import __version__, __author__
 from . import config, ytconnector, protocol, czcommunicator, msg, czcode2
 from .msg import server, client
-from czutils.utils import czlogging, czthreading, cztext, czsystem
+from czutils.utils import czlogging, czthreading, cztext
 import datetime
 import os
 import pickle
@@ -290,8 +290,8 @@ class Server(czthreading.ReactiveThread):
 
     def processMsgConnected(self, message: msg.protocol.MsgConnected):
         if message.clientID in self._clients:
-            _logger.error(f"client {message.clientID} already exists; ignoring 'new' "
-                          f"connection")
+            _logger.warning(f"client {message.clientID} already exists; ignoring 'new' "
+                            f"connection")
             return
         else:
             self._clients[message.clientID] = ClientData()
@@ -303,12 +303,12 @@ class Server(czthreading.ReactiveThread):
 
     def processMsgDisconnected(self, message: msg.protocol.MsgDisconnected):
         if message.clientID not in self._clients:
-            _logger.error(f"client {message.clientID} does not exists; ignoring 'new' "
-                          f"disconnection")
+            _logger.warning(f"client {message.clientID} does not exists; ignoring 'new' "
+                            f"disconnection")
             return
         elif not self._clients[message.clientID].connected:
-            _logger.error(f"client {message.clientID} already marked as disconnected; ignoring "
-                          f"'new' disconnection")
+            _logger.warning(f"client {message.clientID} already marked as disconnected; ignoring "
+                            f"'new' disconnection")
             return
         else:
             self._clients[message.clientID].connected = False
@@ -340,6 +340,7 @@ class Server(czthreading.ReactiveThread):
 
 
     def processMsgAllocate(self, message: msg.server.MsgAllocate):
+        czcode2.nop(message)
         for worker in self._workers:
             if worker.free():
                 try:
@@ -370,21 +371,27 @@ class Server(czthreading.ReactiveThread):
                 message.queryID,
                 f"YT code '{message.ytCode}' already being processed")
             self._stdout.info(f"client {message.clientID}: {response.text}")
-            self._connector.send(response, message.clientID)
+            if message.queryID:
+                self._connector.send(response, message.clientID)
+            #if
         elif message.clientID in self._finishedJobs \
                 and message.ytCode in self._finishedJobs[message.clientID]:
             response = msg.server.MsgResponse(
                 message.queryID,
                 f"YT code '{message.ytCode}' already processed")
             self._stdout.info(f"client {message.clientID}: {response.text}")
-            self._connector.send(response, message.clientID)
+            if message.queryID:
+                self._connector.send(response, message.clientID)
+            #if
         else:
             job = msg.server.Job(message.clientID, message.ytCode)
             response = msg.server.MsgResponse(
                 message.queryID,
                 f"YT code '{message.ytCode}' queued")
             self._stdout.info(f"{job} queued")
-            self._connector.send(response, message.clientID)
+            if message.queryID:
+                self._connector.send(response, message.clientID)
+            #if
             self._queuedJobs.add(job)
             self._dumpQueued()
             self.comm(msg.server.MsgAllocate())
@@ -398,17 +405,28 @@ class Server(czthreading.ReactiveThread):
         processing queue and, if message.responseBuffer is not None, puts a
         response string into it.
         """
+        self._stdout.info(f"client {message.clientID}: playlist {message.ytCode}")
+
         codes, err = ytconnector.getYTList(message.ytCode, self._cookies)
 
         if codes is None:
-            _logger.error(err)
-            message.responseBuffer.put(err)
+            _logger.warning(err)
+            response = msg.server.MsgResponse(message.queryID, err)
+            self._stdout.info(f"client {message.clientID}: {response.text}")
+            self._connector.send(response, message.clientID)
         else:
+            self._connector.send(
+                msg.server.MsgResponse(
+                    message.queryID,
+                    "\n".join([ f"YT code '{code}' queued" for code in codes ])),
+                message.clientID)
             for code in codes:
-                self.comm(msg.client.MsgAddCode(code, message.responseBuffer))
+                newMessage = msg.client.MsgAddCode(code)
+                newMessage.clientID = message.clientID
+                newMessage.queryID = 0
+                self.comm(newMessage)
             #for
         #else
-
     #processMsgAddList
 
 

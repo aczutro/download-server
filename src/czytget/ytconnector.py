@@ -11,11 +11,10 @@
 ################################################################### aczutro ###
 
 """interface to yt downloading library"""
-
+from . import czcode2
 from czutils.utils import czlogging, czcode
 import contextlib
 import io
-import logging
 import yt_dlp
 
 
@@ -32,30 +31,76 @@ def setLoggingOptions(level: int, colour=True) -> None:
 #setLoggingOptions
 
 
-class _YTLogger(logging.Logger):
+class _YTLogger:
     """
     A logger to pass to yt_dlp.
     """
 
     def __init__(self):
-        super().__init__("yt_dlp", level=logging.NOTSET)
         self._logger = czlogging.LoggingChannel("ytdlp",
                                                 czlogging.LoggingLevel.SILENT,
                                                 colour=True)
     #__init__
 
+    def debug(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
+        self._logger.info(msg)
+    #debug
+
     def info(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
         self._logger.info(msg)
     #info
 
     def warning(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
         self._logger.warning(msg)
     #warning
 
     def error(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
         self._logger.error(msg)
     #error
+#_YTLogger
 
+
+class _YTListExtractor:
+    """
+    A logger to pass to yt_dlp.
+    """
+
+    def __init__(self):
+        self._stdout = []
+        self._stderr = []
+    #__init__
+
+    def debug(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
+        self._stdout.append(msg)
+    #debug
+
+    def info(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
+        self._stdout.append(msg)
+    #info
+
+    def warning(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
+        self._stdout.append(msg)
+    #warning
+
+    def error(self, msg, *args, **kwargs):
+        czcode2.nop(args, kwargs)
+        self._stderr.append(msg)
+    #error
+
+    def stdout(self) -> list:
+        return self._stdout
+    #stdout
+
+    def stderr(self) -> list:
+        return self._stderr
+    #stderr
 #_YTLogger
 
 
@@ -90,11 +135,11 @@ class YTConnector:
         ydlOptions = { "quiet": True,
                        "no_warnings": True,
                        "no_color": True,
+                       "verbose": False,
                        "restrictfilenames": True,
                        "windowsfilenames": True,
                        "writedescription": config.descriptions,
                        "logger": _YTLogger(),
-                       "logtostderr": True,
                        "cookiefile": config.cookies,
                        "updatetime": False }
         self._ydl = yt_dlp.YoutubeDL(ydlOptions)
@@ -126,7 +171,7 @@ class YTConnector:
         """
         if self._ydl is not None:
             self._ydl.__exit__()
-            #_logger.info("yt_dlp closed")
+            _logger.info("yt_dlp closed")
         #if
         self._ydl = None
     #close
@@ -157,7 +202,7 @@ class YTConnector:
 #YTConnector
 
 
-def _filter(lines: list):
+def _filter(lines: list) -> set:
     """
     Returns all yt codes contained in 'lines'.
 
@@ -165,11 +210,13 @@ def _filter(lines: list):
     "[info] Available formats for g2Tm7WZ1jPs:".
     Then extracts the code (the last word minus the colon).
     """
+    ans = set()
     for line in lines:
         if "Available formats for" in line:
-            yield line.split()[-1][:-1]
+            ans.add(line.split()[-1][:-1])
         #if
     #for
+    return ans
 #_filter
 
 
@@ -181,13 +228,18 @@ def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
     :returns: If successful, returns [ <code set>, "" ].
               Else, [ None, <error description> ].
     """
-    ydlOptions = { "no_color": True,
+    extractor = _YTListExtractor()
+    ydlOptions = { "quiet": True,
+                   "no_warnings": True,
+                   "no_color": True,
+                   "verbose": False,
                    "listformats": True,
                    "encoding": "utf-8",
-                   "cookiefile": cookies
+                   "cookiefile": cookies,
+                   "logger": extractor,
                    }
 
-    formatInfo =io.StringIO()
+    formatInfo = io.StringIO()
     try:
         with contextlib.redirect_stdout(formatInfo):
             with yt_dlp.YoutubeDL(ydlOptions) as ytdl:
@@ -202,13 +254,12 @@ def getYTList(ytCode: str, cookies: str) -> tuple[set, str]:
         return None, str(e)
     #except
 
-    codes = set(_filter(formatInfo.getvalue().split(sep='\n')))
+    codes = _filter(extractor.stdout())
 
     if len(codes):
         return codes, ""
     else:
-        return None, \
-               "successfully extracted list info, but list is empty"
+        return None, "successfully extracted list info, but list is empty"
     #else
 #getYTList
 

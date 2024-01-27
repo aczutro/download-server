@@ -28,7 +28,7 @@ def czytgetd():
     # config.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    server.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
 
@@ -74,7 +74,7 @@ def czytget():
     # czcommunicator.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # protocol.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # server.setLoggingOptions(czlogging.LoggingLevel.INFO)
-    client.setLoggingOptions(czlogging.LoggingLevel.INFO)
+    # client.setLoggingOptions(czlogging.LoggingLevel.INFO)
     # ytconnector.setLoggingOptions(czlogging.LoggingLevel.INFO)
 
 
